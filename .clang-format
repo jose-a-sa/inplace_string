@@ -1,0 +1,45 @@
+# Generated from CLion C/C++ Code Style settings
+---
+BasedOnStyle: LLVM
+ColumnLimit: 140
+IndentWidth: 4
+TabWidth: 4
+AccessModifierOffset: -4
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# ConstructorInitializerIndentWidth: 4
+# BreakConstructorInitializers: BeforeColon
+# PackConstructorInitializers: Never
+# PenaltyBreakTemplateDeclaration: 0
+# AlignAfterOpenBracket: false
+# BreakAfterOpenBracketBracedList: true
+# BreakBeforeCloseBracketBracedList: false
+# BreakAfterOpenBracketFunction: false
+# BreakBeforeCloseBracketFunction: false
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  BeforeWhile: true
+  AfterCaseLabel: true
+  AfterExternBlock: true
+  BeforeLambdaBody: true
+  SplitEmptyFunction: false
+  SplitEmptyNamespace: false
+  SplitEmptyRecord: false
+  IndentBraces: false
+
+#NamespaceIndentation: All
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+BreakTemplateDeclarations: Yes
+QualifierAlignment: Right

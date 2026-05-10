@@ -1,0 +1,21 @@
+---
+# qxlib Clang-Tidy Configuration
+Checks: >
+    -*,
+    google-*,
+    bugprone-*,
+    cppcoreguidelines-*,
+    modernize-*,
+    performance-*,
+    readability-*,
+    -modernize-use-trailing-return-type,
+    -cppcoreguidelines-avoid-magic-numbers,
+    -cppcoreguidelines-pro-type-reinterpret-cast,
+    -readability-magic-numbers,
+    -readability-braces-around-statements,
+    -cppcoreguidelines-c-copy-assignment-signature,
+    -cppcoreguidelines-avoid-do-while,
+    -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+    -google-readability-braces-around-statements,
+    -bugprone-easily-swappable-parameters,
+    -readability-identifier-length
