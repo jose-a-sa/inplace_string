@@ -5,6 +5,7 @@
 #include <cassert>
 #include <charconv>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <iterator>
 #include <limits>
@@ -19,6 +20,7 @@
 #define QX_STL_LIBCPP // libc++
 #elif defined(__GLIBCXX__)
 #define QX_STL_LIBSTDCXX // libstdc++
+#include <bits/stl_iterator.h>
 #elif defined(_MSC_VER)
 #define QX_STL_MSVC // Visual Studio
 #endif
@@ -85,24 +87,6 @@ inline constexpr bool nothrow_contract_violation = noexcept(contract_violation("
     while (0)
 #endif
 #endif
-
-// min_uint_t: smallest unsigned integer type with at least N bits
-// clang-format off
-template <std::size_t N>
-using min_uint_t =
-    std::conditional_t<(N <= 8),  std::uint8_t,
-    std::conditional_t<(N <= 16), std::uint16_t,
-    std::conditional_t<(N <= 32), std::uint32_t,
-    std::uint64_t>>>;
-// clang-format on
-
-// inplace_arithmetic_buffer_size : buffer size for converting arithmetic types to string with std::to_chars
-template <class T>
-struct inplace_arithmetic_buffer_size
-{
-    static constexpr size_t value =
-        std::is_integral_v<T> ? (std::numeric_limits<T>::digits10 + 1 + std::is_signed_v<T>) : 30 + (static_cast<int>(sizeof(T) > 8) * 32);
-};
 
 // iterator_value
 
@@ -247,22 +231,22 @@ constexpr bool is_overlapping_range(T const* begin, T const* end, U const* begin
 // optimizations when copying from such iterators, while still being safe in the presence of overlapping ranges.
 
 template <typename Iter, typename = void>
-struct str_is_trivial_iterator : std::false_type
+struct is_trivial_contiguous_iterator : std::false_type
 {};
 template <typename T>
-struct str_is_trivial_iterator<T*, void> : std::is_arithmetic<T>
+struct is_trivial_contiguous_iterator<T*, void> : std::is_arithmetic<T>
 {};
 template <class Iter>
-struct str_is_trivial_iterator<Iter, std::void_t<iter_value_t<Iter>>>
+struct is_trivial_contiguous_iterator<Iter, std::void_t<iter_value_t<Iter>>>
     : std::integral_constant<bool, is_contiguous_iterator_v<Iter> && std::is_arithmetic_v<iter_value_t<Iter>>>
 {};
 
-static_assert(str_is_trivial_iterator<std::vector<char>::iterator>::value);
-static_assert(!str_is_trivial_iterator<std::deque<char>::iterator>::value);
-static_assert(!str_is_trivial_iterator<std::list<char>::iterator>::value);
-static_assert(str_is_trivial_iterator<std::array<char, 10>::iterator>::value);
-static_assert(str_is_trivial_iterator<std::string::iterator>::value);
-static_assert(str_is_trivial_iterator<std::string_view::iterator>::value);
+static_assert(is_trivial_contiguous_iterator<std::vector<char>::iterator>::value);
+static_assert(!is_trivial_contiguous_iterator<std::deque<char>::iterator>::value);
+static_assert(!is_trivial_contiguous_iterator<std::list<char>::iterator>::value);
+static_assert(is_trivial_contiguous_iterator<std::array<char, 10>::iterator>::value);
+static_assert(is_trivial_contiguous_iterator<std::string::iterator>::value);
+static_assert(is_trivial_contiguous_iterator<std::string_view::iterator>::value);
 
 } // namespace intl
 
@@ -326,8 +310,13 @@ using inplace_u16string = basic_inplace_string<N, char16_t>;
 template <std::size_t N>
 using inplace_u32string = basic_inplace_string<N, char32_t>;
 
-// remove_cvref
-
+/**
+ * \brief
+ *
+ * \tparam N
+ * \tparam CharT
+ * \tparam Traits
+ */
 template <std::size_t N, class CharT, class Traits>
 class basic_inplace_string
 {
@@ -338,24 +327,28 @@ class basic_inplace_string
     static_assert(std::is_trivially_copyable_v<CharT>, "Character type of basic_inplace_string must be trivially copyable");
     static_assert(std::is_same_v<CharT, typename Traits::char_type>, "Traits::char_type must be the same type as CharT");
 
-    using self = basic_inplace_string;
-    using self_view = std::basic_string_view<CharT, Traits>;
-    using internal_size_type = intl::min_uint_t<N>;
-
-    template <class T>
+    template <class U>
     using enable_if_string_like_t =
-        std::enable_if_t<std::is_convertible_v<T const&, self_view> && !std::is_convertible_v<T const&, CharT const*> &&
-                             !std::is_same_v<remove_cvref_t<T>, self>,
+        std::enable_if_t<std::is_convertible_v<U const&, std::basic_string_view<CharT, Traits>> &&
+                             !std::is_convertible_v<U const&, CharT const*> && !std::is_same_v<remove_cvref_t<U>, basic_inplace_string>,
                          int>;
 
-    /**
-     * Helper struct for the storage to be aligned to std::string, std::size_t
-     */
+    using self = basic_inplace_string;
+    using self_view = std::basic_string_view<CharT, Traits>;
+    using internal_size_type = // clang-format off
+        std::conditional_t<(N <= 8),  std::uint8_t,
+        std::conditional_t<(N <= 16), std::uint16_t,
+        std::conditional_t<(N <= 32), std::uint32_t,
+        std::uint64_t>>>;
+    // clang-format on
+
+    // The actual size type used for storing the size of the string. It is chosen based on the maximum size of the string (N) to save space.
+    // It is guaranteed to be large enough to store any size up to N, and it is an unsigned integer type for simplicity of implementation.
     template <class SizeT, class T, std::size_t M>
     struct alignas(std::size_t) inplace_string_storage
     {
         SizeT size{};
-        std::array<T, M + 1> data{};
+        std::array<T, M + 1> buffer{};
     };
 
     inplace_string_storage<internal_size_type, CharT, N> storage_{};
@@ -427,7 +420,7 @@ public:
     // template <ContainterCompatibleRange<CharT> R>
     // constexpr basic_inplace_string(std::from_range_t, R&& rg); // since C++23
 
-    constexpr basic_inplace_string(std::initializer_list<CharT> ilist) noexcept { init(ilist.begin(), ilist.end()); }
+    constexpr basic_inplace_string(std::initializer_list<CharT> il) noexcept { init(il.begin(), il.end()); }
 
     explicit constexpr operator self_view() const noexcept { return self_view(data(), size()); }
 
@@ -449,12 +442,12 @@ public:
         return *this;
     }
 
-    basic_inplace_string& operator=(std::initializer_list<CharT> ilist) { return assign(ilist.begin(), ilist.size()); }
+    basic_inplace_string& operator=(std::initializer_list<CharT> il) { return assign(il.begin(), il.size()); }
 
-    constexpr iterator begin() noexcept { return storage_.data.begin(); }
-    constexpr const_iterator begin() const noexcept { return storage_.data.begin(); }
-    constexpr iterator end() noexcept { return storage_.data.begin() + size(); }
-    constexpr const_iterator end() const noexcept { return storage_.data.begin() + size(); }
+    constexpr iterator begin() noexcept { return storage_.buffer.begin(); }
+    constexpr const_iterator begin() const noexcept { return storage_.buffer.begin(); }
+    constexpr iterator end() noexcept { return storage_.buffer.begin() + size(); }
+    constexpr const_iterator end() const noexcept { return storage_.buffer.begin() + size(); }
 
     constexpr reverse_iterator rbegin() noexcept { reverse_iterator(end()); };
     constexpr const_reverse_iterator rbegin() const noexcept { reverse_iterator(end()); }
@@ -493,28 +486,28 @@ public:
 
     [[nodiscard]] bool empty() const noexcept { return size() == 0; }
 
-    const_reference operator[](size_type pos) const
+    const_reference operator[](size_type pos) const noexcept
     {
         QX_ASSERT_CONTRACT(pos < size(), "basic_inplace_string(const char*, n) detected nullptr");
-        return storage_.data[pos];
+        return storage_.buffer[pos];
     }
 
-    reference operator[](size_type pos)
+    reference operator[](size_type pos) noexcept
     {
         QX_ASSERT_CONTRACT(pos < size(), "basic_inplace_string(const char*, n) detected nullptr");
-        return storage_.data[pos];
+        return storage_.buffer[pos];
     }
 
     const_reference at(size_type pos) const
     {
         QX_ASSERT_THROW(pos < size(), std::out_of_range, "basic_inplace_string");
-        return (*this)[pos];
+        return storage_.buffer[pos];
     }
 
     reference at(size_type pos)
     {
         QX_ASSERT_THROW(pos < size(), std::out_of_range, "basic_inplace_string");
-        return (*this)[pos];
+        return storage_.buffer[pos];
     }
 
     basic_inplace_string& operator+=(basic_inplace_string const& str) { return append(str); }
@@ -533,7 +526,7 @@ public:
         return *this;
     }
 
-    basic_inplace_string& operator+=(std::initializer_list<CharT> ilist) { return append(ilist.begin(), ilist.end()); }
+    basic_inplace_string& operator+=(std::initializer_list<CharT> il) { return append(il.begin(), il.end()); }
 
     basic_inplace_string& append(basic_inplace_string const& str) { return append(str.data(), str.size()); }
 
@@ -606,7 +599,7 @@ public:
             if (n == 0)
                 return *this;
 
-            if constexpr (intl::str_is_trivial_iterator<Iterator>::value)
+            if constexpr (intl::is_trivial_contiguous_iterator<Iterator>::value)
             {
                 if (!address_in_range(*first))
                 {
@@ -626,7 +619,7 @@ public:
     // template <ContainterCompatibleRange<CharT> R>
     // constexpr basic_inplace_string& append_range(R&& rg);            // C++23
 
-    basic_inplace_string& append(std::initializer_list<CharT> ilist) { return append(ilist.begin(), ilist.size()); }
+    basic_inplace_string& append(std::initializer_list<CharT> il) { return append(il.begin(), il.size()); }
 
     void push_back(CharT c); // constexpr since C++20
     void pop_back();         // constexpr since C++20
@@ -687,7 +680,7 @@ public:
     // template <ContainterCompatibleRange<CharT> R>
     // constexpr basic_inplace_string& assign_range(R&& rg);            // C++23
 
-    basic_inplace_string& assign(std::initializer_list<CharT> ilist) { return assign(ilist.begin(), ilist.size()); }
+    basic_inplace_string& assign(std::initializer_list<CharT> il) { return assign(il.begin(), il.size()); }
 
     basic_inplace_string& insert(size_type pos1, basic_inplace_string const& str) { return insert(pos1, str.data(), str.size()); }
 
@@ -733,7 +726,7 @@ public:
     // template <ContainterCompatibleRange<CharT> R>
     // constexpr iterator insert_range(const_iterator p, R&& rg);            // C++23
 
-    iterator insert(const_iterator pos, std::initializer_list<CharT> ilist) { return insert(pos, ilist.begin(), ilist.end()); }
+    iterator insert(const_iterator pos, std::initializer_list<CharT> il) { return insert(pos, il.begin(), il.end()); }
 
     basic_inplace_string& erase(size_type pos = 0, size_type n = npos); // constexpr since C++20
 
@@ -820,9 +813,9 @@ public:
     // template <ContainterCompatibleRange<CharT> R>
     // constexpr basic_inplace_string& replace_with_range(const_iterator i1, const_iterator i2, R&& rg); // C++23
 
-    basic_inplace_string& replace(const_iterator it1, const_iterator it2, std::initializer_list<CharT> ilist)
+    basic_inplace_string& replace(const_iterator it1, const_iterator it2, std::initializer_list<CharT> il)
     {
-        return replace(it1, it2, ilist.begin(), ilist.end());
+        return replace(it1, it2, il.begin(), il.end());
     }
 
     size_type copy(CharT* str, size_type n, size_type pos = 0) const
@@ -839,10 +832,10 @@ public:
     void swap(basic_inplace_string& other) noexcept
     {
         std::size_t const max_s = std::max(size(), other.size());
-        std::swap_ranges(storage_.data, storage_.data + max_s, other.data());
+        std::swap_ranges(storage_.buffer, storage_.buffer + max_s, other.data());
         std::swap(storage_.size, other.storage_.size);
         // Maintain Null Terminators
-        Traits::assign(storage_.data[storage_.size], CharT{});
+        Traits::assign(storage_.buffer[storage_.size], CharT{});
         Traits::assign(other.data()[other.storage_.size], CharT{});
     }
 
@@ -854,19 +847,19 @@ public:
 
         std::size_t const max_s = std::max(size(), other.size());
 
-        std::swap_ranges(storage_.data, storage_.data + max_s, other.data());
+        std::swap_ranges(storage_.buffer, storage_.buffer + max_s, other.data());
         std::swap(storage_.size, other.storage_.size);
 
         // Maintain Null Terminators
-        Traits::assign(storage_.data[storage_.size], CharT{});
+        Traits::assign(storage_.buffer[storage_.size], CharT{});
         Traits::assign(other.data()[other.storage_.size], CharT{});
     }
 
     // c_str, data
 
     CharT const* c_str() const noexcept { return data(); }
-    CharT const* data() const noexcept { return storage_.data.data(); }
-    CharT* data() noexcept { return storage_.data.data(); }
+    CharT const* data() const noexcept { return storage_.buffer.data(); }
+    CharT* data() noexcept { return storage_.buffer.data(); }
 
     // find
 
@@ -1144,20 +1137,20 @@ private:
     {
         QX_ASSERT_CONTRACT(size <= std::numeric_limits<internal_size_type>::max(), "basic_inplace_string");
         storage_.size = static_cast<internal_size_type>(size);
-        Traits::assign(storage_.data[storage_.size], value_type{});
+        Traits::assign(storage_.buffer[size], value_type{});
     }
 
     constexpr void init(value_type const* str, size_type n)
     {
         QX_ASSERT_THROW(n <= max_size(), std::length_error, "basic_inplace_string");
-        Traits::copy(storage_.data.data(), str, n);
+        Traits::copy(storage_.buffer.data(), str, n);
         set_size_and_null_terminate(n);
     }
 
     constexpr void init(size_type n, value_type c)
     {
         QX_ASSERT_THROW(n <= max_size(), std::length_error, "basic_inplace_string");
-        Traits::assign(storage_.data.data(), n, c);
+        Traits::assign(storage_.buffer.data(), n, c);
         set_size_and_null_terminate(n);
     }
 
@@ -1178,6 +1171,7 @@ private:
     template <class Iterator, class Sentinel>
     void init_with_sentinel(Iterator first, Sentinel last)
     {
+        // strong exception guarantee: if an exception is thrown during initialization, the string is left in a valid empty state
         try
         {
             for (; first != last; ++first)
@@ -1190,8 +1184,8 @@ private:
         }
     }
 
-    template <class ForwardIterator, class Sentinel>
-    void init_with_size(ForwardIterator first, Sentinel last, size_type sz)
+    template <class Iterator, class Sentinel>
+    void init_with_size(Iterator first, Sentinel last, size_type sz)
     {
         // complete
     }
@@ -1202,12 +1196,12 @@ private:
         return intl::is_pointer_in_range(data(), data() + size() + 1, std::addressof(c));
     }
 
-    template <class ForwardIterator, class Sentinel>
-    static value_type* copy_non_overlapping_range(ForwardIterator first, Sentinel last, value_type* dest)
+    template <class Iterator, class Sentinel>
+    static value_type* copy_non_overlapping_range(Iterator first, Sentinel last, value_type* dest)
     {
         using iterator_value_type = remove_cvref_t<decltype(*first)>;
-        if constexpr (intl::is_contiguous_iterator<ForwardIterator>::value && std::is_same_v<value_type, iterator_value_type> &&
-                      std::is_same_v<ForwardIterator, Sentinel>)
+        if constexpr (intl::is_contiguous_iterator<Iterator>::value && std::is_same_v<value_type, iterator_value_type> &&
+                      std::is_same_v<Iterator, Sentinel>)
         {
             QX_ASSERT_CONTRACT(!intl::is_overlapping_range(to_address(first), to_address(last), dest),
                                "copy_non_overlapping_range called with an overlapping range!");
@@ -1259,7 +1253,7 @@ private:
         if (result == ptr + sz)
             return npos;
 
-        return static_cast<std::size_t>(result - ptr);
+        return static_cast<size_type>(result - ptr);
     }
 
     static size_type str_find(value_type const* ptr, size_type sz, value_type c, size_type pos) noexcept
@@ -1637,7 +1631,9 @@ inplace_string<N> unchecked_to_inplace_string(T val) noexcept
 template <class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 auto to_inplace_string(T val) noexcept
 {
-    return unchecked_to_inplace_string<intl::inplace_arithmetic_buffer_size<T>::value>(val);
+    static constexpr std::size_t buffer_size =
+        std::is_integral_v<T> ? (std::numeric_limits<T>::digits10 + 1 + std::is_signed_v<T>) : 30 + (static_cast<int>(sizeof(T) > 8) * 32);
+    return unchecked_to_inplace_string<buffer_size>(val);
 }
 
 } // namespace qx
