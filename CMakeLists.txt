@@ -35,23 +35,58 @@ target_sources(inplace_string INTERFACE
   FILES "include/qx/inplace_string.h"
 )
 
-
 enable_testing()
 include(GoogleTest)
 
-file(GLOB_RECURSE _qx_tests CONFIGURE_DEPENDS "tests/*.cpp")
+# ... (FetchContent and library definition remain the same) ...
 
-add_executable(inplace_string_tests)
+# 3. Only keep the individual test executables
+file(GLOB_RECURSE _qx_tests "tests/*.cpp")
 
-target_sources(inplace_string_tests
-  PRIVATE "${_qx_tests}"
-)
+# Exclude any dummy files if they exist
+list(REMOVE_ITEM _qx_tests "${CMAKE_CURRENT_SOURCE_DIR}/tests/coverage_dummy.cpp")
+set(_qx_testnames)
 
-target_link_libraries(inplace_string_tests
-  PRIVATE
-  gmock_main
-  fmt::fmt
-  qx::inplace_string
-)
+foreach(_test_file IN LISTS _qx_tests)
+  get_filename_component(_test_name "${_test_file}" NAME_WE)
 
-gtest_discover_tests(inplace_string_tests)
+  add_executable("${_test_name}" "${_test_file}")
+  target_link_libraries("${_test_name}"
+    PRIVATE
+    gmock_main
+    fmt::fmt
+    qx::inplace_string
+  )
+  gtest_discover_tests("${_test_name}")
+  list(APPEND _qx_testnames "${_test_name}")
+endforeach()
+
+option(ENABLE_COVERAGE "" ON)
+
+if(ENABLE_COVERAGE)
+  add_compile_options(--coverage -O0 -fno-inline)
+  add_link_options(--coverage)
+  find_program(LCOV_EXECUTABLE NAMES lcov)
+  find_program(GENHTML_EXECUTABLE NAMES genhtml)
+
+  # 2. Add a custom target that uses these found paths
+  if(LCOV_EXECUTABLE AND GENHTML_EXECUTABLE)
+    add_custom_target(coverage
+      COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+
+      # Note the use of nested quotes to protect the wildcards from shell expansion
+      COMMAND ${LCOV_EXECUTABLE} --capture --directory .
+              --output-file lcov.info
+              --include "'*/include/qx/*'"
+              --exclude "'*/_deps/*'"
+              --exclude "'/opt/homebrew/*'"
+              --ignore-errors inconsistent,unsupported
+      COMMAND ${GENHTML_EXECUTABLE} lcov.info
+              --output-directory coverage_report
+              --ignore-errors inconsistent,unsupported,category
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+      COMMENT "Generating coverage using tools found in Kit environment..."
+    )
+    add_dependencies(coverage ${_qx_testnames})
+  endif()
+endif()
