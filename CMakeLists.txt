@@ -60,33 +60,3 @@ foreach(_test_file IN LISTS _qx_tests)
   gtest_discover_tests("${_test_name}")
   list(APPEND _qx_testnames "${_test_name}")
 endforeach()
-
-option(ENABLE_COVERAGE "" ON)
-
-if(ENABLE_COVERAGE)
-  add_compile_options(--coverage -O0 -fno-inline)
-  add_link_options(--coverage)
-  find_program(LCOV_EXECUTABLE NAMES lcov)
-  find_program(GENHTML_EXECUTABLE NAMES genhtml)
-
-  # 2. Add a custom target that uses these found paths
-  if(LCOV_EXECUTABLE AND GENHTML_EXECUTABLE)
-    add_custom_target(coverage
-      COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-
-      # Note the use of nested quotes to protect the wildcards from shell expansion
-      COMMAND ${LCOV_EXECUTABLE} --capture --directory .
-              --output-file lcov.info
-              --include "'*/include/qx/*'"
-              --exclude "'*/_deps/*'"
-              --exclude "'/opt/homebrew/*'"
-              --ignore-errors inconsistent,unsupported
-      COMMAND ${GENHTML_EXECUTABLE} lcov.info
-              --output-directory coverage_report
-              --ignore-errors inconsistent,unsupported,category
-      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-      COMMENT "Generating coverage using tools found in Kit environment..."
-    )
-    add_dependencies(coverage ${_qx_testnames})
-  endif()
-endif()
