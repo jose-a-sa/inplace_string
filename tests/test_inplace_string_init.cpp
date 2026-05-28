@@ -4,7 +4,7 @@
 
 TEST(InplaceStringInitTest, DefaultConstructor)
 {
-    qx::inplace_string<10> s;
+    qx::inplace_string<10> const s;
     EXPECT_TRUE(s.empty());
     EXPECT_EQ(s.size(), 0);
     EXPECT_EQ(s.capacity(), 10);
@@ -14,36 +14,51 @@ TEST(InplaceStringInitTest, DefaultConstructor)
 
 TEST(InplaceStringInitTest, CStringConstructor)
 {
-    qx::inplace_string<10> s("hello");
+    qx::inplace_string<10> const s("hello");
     EXPECT_EQ(s.size(), 5);
     EXPECT_STREQ(s.c_str(), "hello");
 
-    qx::inplace_string<20> s2("hello world", 7);
+    qx::inplace_string<20> const s2("hello world", 7);
     EXPECT_EQ(s2.size(), 7);
     EXPECT_STREQ(s2.c_str(), "hello w");
+
+    auto const* str = "world";
+    qx::inplace_string<20> const s3(str);
+    EXPECT_EQ(s3.size(), 5);
+    EXPECT_STREQ(s3.c_str(), "world");
 }
 
 TEST(InplaceStringInitTest, StringViewConstructor)
 {
-    std::string_view sv = "world";
-    qx::inplace_string<10> s(sv);
+    constexpr std::string_view sv = "world";
+    qx::inplace_string<10> const s(sv);
     EXPECT_EQ(s.size(), 5);
     EXPECT_STREQ(s.c_str(), "world");
+
+    std::string const str = "my test str";
+    qx::inplace_string<15> const s2(str);
+    EXPECT_EQ(s2.size(), 11);
+    EXPECT_STREQ(s2.c_str(), "my test str");
+
+    std::string const str2 = "my_substring";
+    qx::inplace_string<15> const s3(str2, 6, 6);
+    EXPECT_EQ(s3.size(), 6);
+    EXPECT_STREQ(s3.c_str(), "string");
 }
 
 TEST(InplaceStringInitTest, FillConstructor)
 {
-    qx::inplace_string<5> s(4, 'x');
+    qx::inplace_string<5> const s(4, 'x');
     EXPECT_EQ(s.size(), 4);
     EXPECT_STREQ(s.c_str(), "xxxx");
 
-    EXPECT_THROW(({ (void)qx::inplace_string<5>(6, 'x'); }), std::length_error);
+    EXPECT_THROW((qx::inplace_string<5>(6, 'x')), std::length_error);
 }
 
 TEST(InplaceStringInitTest, CopyConstructorAndSubstring)
 {
-    qx::inplace_string<10> orig("abcdef");
-    qx::inplace_string<10> copy(orig, 2, 3);
+    qx::inplace_string<10> const orig("abcdef");
+    qx::inplace_string<10> const copy(orig, 2, 3);
     EXPECT_EQ(copy.size(), 3);
     EXPECT_STREQ(copy.c_str(), "cde");
 
@@ -77,14 +92,14 @@ TEST(InplaceStringInitTest, Assignment)
 TEST(InplaceStringInitTest, RangeConstructor)
 {
     std::vector<char> v = {'a', 'b', 'c', 'd'};
-    qx::inplace_string<10> s(v.begin(), v.end());
+    qx::inplace_string<10> const s(v.begin(), v.end());
     EXPECT_EQ(s.size(), 4);
     EXPECT_STREQ(s.c_str(), "abcd");
 }
 
 TEST(InplaceStringInitTest, InitializerListConstructor)
 {
-    qx::inplace_string<10> s = {'h', 'e', 'l', 'l', 'o'};
+    qx::inplace_string<10> const s = {'h', 'e', 'l', 'l', 'o'};
     EXPECT_EQ(s.size(), 5);
     EXPECT_STREQ(s.c_str(), "hello");
 }
@@ -92,7 +107,7 @@ TEST(InplaceStringInitTest, InitializerListConstructor)
 TEST(InplaceStringInitTest, MoveConstructor)
 {
     qx::inplace_string<10> s1("move_me");
-    qx::inplace_string<10> s2(std::move(s1));
+    qx::inplace_string<10> const s2(std::move(s1));
     EXPECT_STREQ(s2.c_str(), "move_me");
     EXPECT_EQ(s2.size(), 7);
     // Note: s1 is in a valid but unspecified state after move

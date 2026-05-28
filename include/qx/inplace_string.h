@@ -98,28 +98,31 @@ using iter_value_t = typename std::iterator_traits<Iter>::value_type;
 // iterator_category (C++17 and earlier)
 
 template <class Iter>
-using iter_category_t = typename Iter::iterator_category;
+using iter_category_t = typename std::iterator_traits<Iter>::iterator_category;
 
 template <class Iter, class Cat, class = void>
-struct has_iter_category_convertible_to : std::false_type
+struct has_iter_category : std::false_type
 {};
 template <class Iter, class Cat>
-struct has_iter_category_convertible_to<Iter, Cat, std::void_t<iter_category_t<Iter>>> : std::is_convertible<iter_category_t<Iter>, Cat>
+struct has_iter_category<Iter, Cat, std::void_t<iter_category_t<Iter>>> : std::is_convertible<iter_category_t<Iter>, Cat>
 {};
+template <class Iter, class Cat>
+inline constexpr bool has_iter_category_v = has_iter_category<Iter, Cat>::value;
 
 // iterator_concept (C++20)
 
 #if __cplusplus >= 202002L
 template <class Iter>
-using iter_concept_t = typename Iter::iterator_concept;
+using iter_concept_t = typename std::iterator_traits<Iter>::iterator_concept;
 
 template <class Iter, class Concept, class = void>
-struct has_iter_concept_convertible_to : std::false_type
+struct has_iter_concept : std::false_type
 {};
 template <class Iter, class Concept>
-struct has_iter_concept_convertible_to<Iter, Concept, std::void_t<iter_concept_t<Iter>>>
-    : std::is_convertible<iter_concept_t<Iter>, Concept>
+struct has_iter_concept<Iter, Concept, std::void_t<iter_concept_t<Iter>>> : std::is_convertible<iter_concept_t<Iter>, Concept>
 {};
+template <class Iter, class Concept>
+inline constexpr bool has_iter_concept_v = has_iter_concept<Iter, Concept>::value;
 #endif
 
 // is_contiguous_iterator
@@ -153,11 +156,9 @@ struct is_contiguous_iterator
     using Unwrapped = decltype(std::_Unwrap_iter(std::declval<T>()));
     static constexpr bool value = std::is_pointer_v<Unwrapped>;
 };
-#else
-// Fallback for unknown libraries (Check for slimness and at least random access iterator category, trivially copyable and pointer-sized)
+#else // Fallback for unknown libraries
 template <class T>
-struct is_contiguous_iterator : std::integral_constant<bool, has_iter_category_convertible_to<T, std::random_access_iterator_tag>::value &&
-                                                                 sizeof(T) == sizeof(void*)>
+struct is_contiguous_iterator : std::false_type
 {};
 #endif
 
@@ -178,6 +179,8 @@ template <class Ptr>
 struct has_pointer_traits_to_address<Ptr, std::void_t<decltype(std::pointer_traits<Ptr>::to_address(std::declval<Ptr const&>()))>>
     : std::true_type
 {};
+template <class Ptr>
+inline constexpr bool has_pointer_traits_to_address_v = has_pointer_traits_to_address<Ptr>::value;
 
 // has_arrow_operator
 
@@ -187,12 +190,16 @@ struct has_arrow_operator : std::false_type
 template <class Ptr>
 struct has_arrow_operator<Ptr, std::void_t<decltype(std::declval<Ptr const&>().operator->())>> : std::true_type
 {};
+template <class Ptr>
+inline constexpr bool has_arrow_operator_v = has_arrow_operator<Ptr>::value;
 
 // is_fancy_pointer
 
 template <class Ptr>
-struct is_fancy_pointer : std::integral_constant<bool, has_arrow_operator<Ptr>::value || has_pointer_traits_to_address<Ptr>::value>
+struct is_fancy_pointer : std::integral_constant<bool, has_arrow_operator_v<Ptr> || has_pointer_traits_to_address_v<Ptr>>
 {};
+template <class Ptr>
+inline constexpr bool is_fancy_pointer_v = is_fancy_pointer<Ptr>::value;
 
 // is_less_than_comparable
 
@@ -202,6 +209,18 @@ struct is_less_than_comparable : std::false_type
 template <class T, class U>
 struct is_less_than_comparable<T, U, std::void_t<decltype(std::declval<T>() < std::declval<U>())>> : std::true_type
 {};
+template <class T, class U>
+inline constexpr bool is_less_than_comparable_v = is_less_than_comparable<T, U>::value;
+
+// convertible_to_string_view
+
+template <class CharT, class Traits, class T>
+struct convertible_to_string_view
+    : public std::integral_constant<bool, std::is_convertible_v<T const&, std::basic_string_view<CharT, Traits>> &&
+                                              !std::is_convertible_v<T const&, CharT const*>>
+{};
+template <class CharT, class Traits, class T>
+inline constexpr bool convertible_to_string_view_v = convertible_to_string_view<CharT, Traits, T>::value;
 
 // is_pointer_in_range: checks if a pointer of type U* points to an address in the range [begin, end) of type T*, even if T and U are
 // different types (e.g. char and unsigned char). This is used to check for overlapping ranges when appending or inserting from iterators
@@ -257,6 +276,8 @@ template <class Iter>
 struct is_trivial_contiguous_iterator<Iter, std::void_t<iter_value_t<Iter>>>
     : std::integral_constant<bool, is_contiguous_iterator_v<Iter> && std::is_arithmetic_v<iter_value_t<Iter>>>
 {};
+template <class Iter>
+inline constexpr bool is_trivial_contiguous_iterator_v = is_trivial_contiguous_iterator<Iter>::value;
 
 static_assert(is_trivial_contiguous_iterator<std::vector<char>::iterator>::value);
 static_assert(!is_trivial_contiguous_iterator<std::deque<char>::iterator>::value);
@@ -326,10 +347,8 @@ using inplace_u16string = basic_inplace_string<N, char16_t>;
 template <std::size_t N>
 using inplace_u32string = basic_inplace_string<N, char32_t>;
 
-
 template <class CharT, size_t N>
 basic_inplace_string(CharT const (&)[N]) -> basic_inplace_string<N - 1, CharT>; // NOLINT(*-avoid-c-arrays)
-
 
 /**
  * \brief
@@ -354,11 +373,14 @@ class basic_inplace_string
     // clang-format off
     template <class U>
     using enable_if_string_like_t =
-        std::enable_if_t<std::is_convertible_v<U const&, std::basic_string_view<CharT, Traits>> &&
-                        !std::is_convertible_v<U const&, CharT const*> && 
+        std::enable_if_t<intl::convertible_to_string_view<CharT, Traits, U>::value, int>;
+        
+    template <class U>
+    using enable_if_unsame_string_like_t =
+        std::enable_if_t<intl::convertible_to_string_view<CharT, Traits, U>::value && 
                         !std::is_same_v<remove_cvref_t<U>, basic_inplace_string>, int>;
 
-    // NOLINTBEGIN(google-runtime-int) 
+    // NOLINTBEGIN(google-runtime-int)
     using internal_size_type = 
         std::conditional_t<N <= std::numeric_limits<unsigned char>::max(), unsigned char,
         std::conditional_t<N <= std::numeric_limits<unsigned short>::max(), unsigned short,
@@ -389,10 +411,10 @@ public:
     using pointer = value_type*;
     using const_pointer = value_type const*;
 
-    using iterator = typename self_view::iterator;
-    using const_iterator = typename self_view::const_iterator;
-    using reverse_iterator = typename self_view::reverse_iterator;
-    using const_reverse_iterator = typename self_view::const_reverse_iterator;
+    using iterator = pointer;
+    using const_iterator = const_pointer;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
     static constexpr size_type npos = -1;
 
@@ -407,17 +429,18 @@ public:
         init(str.data() + pos, std::min(n, str_sz - pos));
     }
 
-    template <std::size_t M>
-    explicit constexpr basic_inplace_string(CharT const (&str)[M]) { init(str, M - 1); } // NOLINT(*-avoid-c-arrays)
-
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     explicit constexpr basic_inplace_string(StringLike const& str)
     {
         auto const str_view = self_view(str);
         init(str_view.data(), str_view.size());
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
+    constexpr basic_inplace_string(StringLike const& str, size_type pos) : basic_inplace_string(str, pos, npos)
+    {}
+
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     constexpr basic_inplace_string(StringLike const& str, size_type pos, size_type n)
     {
         self_view const str_view = self_view(str).substr(pos, n);
@@ -440,8 +463,8 @@ public:
 
     constexpr basic_inplace_string(size_type n, CharT c) { init(n, c); }
 
-    template <class Iterator>
-    constexpr basic_inplace_string(Iterator begin, Iterator end) noexcept
+    template <class InputIterator, std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    constexpr basic_inplace_string(InputIterator begin, InputIterator end) noexcept
     {
         init(begin, end);
     }
@@ -463,7 +486,7 @@ public:
     // NOLINTNEXTLINE(*-explicit-constructor,*-explicit-conversions)
     constexpr operator self_view() const noexcept { return self_view(data(), size()); }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& operator=(StringLike const& str)
     {
         return assign(str);
@@ -471,7 +494,7 @@ public:
 
     basic_inplace_string& operator=(CharT const* str) { return assign(str); }
 
-    basic_inplace_string& operator=(std::nullptr_t) = delete;
+    basic_inplace_string& operator=(std::nullptr_t) = delete; // C++23
 
     basic_inplace_string& operator=(CharT c)
     {
@@ -509,13 +532,30 @@ public:
         if (n > size())
             append(n - size(), c);
         else
-            set_size_and_null_terminate(n);
+            erase_to_end(n);
     }
 
     void resize(size_type n) { resize(n, value_type{}); }
 
     template <class Operation>
-    constexpr void resize_and_overwrite(size_type n, Operation op); // since C++23
+    constexpr void resize_and_overwrite(size_type n, Operation op) // since C++23
+    {
+        size_type const sz = size();
+        if (n > sz)
+        {
+            if (n > 0)
+            {
+                size_type const cap = capacity();
+                QX_ASSERT_THROW(n <= cap - sz, std::length_error{"basic_inplace_string"});
+                set_size_and_null_terminate(sz + n);
+            }
+            else
+            {
+                erase_to_end(n);
+            }
+        }
+        erase_to_end(std::move(op)(data(), static_cast<std::decay_t<decltype(n)>>(n)));
+    };
 
     void reserve(size_type n) { QX_ASSERT_THROW(n <= max_size(), std::length_error{"basic_inplace_string"}); }
 
@@ -551,7 +591,7 @@ public:
 
     basic_inplace_string& operator+=(basic_inplace_string const& str) { return append(str); }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& operator+=(StringLike const& str)
     {
         return append(str);
@@ -569,7 +609,7 @@ public:
 
     basic_inplace_string& append(basic_inplace_string const& str) { return append(str.data(), str.size()); }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& append(StringLike const& str)
     {
         auto const str_view = self_view(str);
@@ -583,7 +623,7 @@ public:
         return append(str.data() + pos, std::min(n, str_sz - pos));
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& append(StringLike const& str, size_type pos, size_type n = npos)
     {
         auto const str_view = self_view(str);
@@ -627,10 +667,10 @@ public:
         return *this;
     }
 
-    template <class Iterator>
-    basic_inplace_string& append(Iterator first, Iterator last)
+    template <class InputIterator, std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    basic_inplace_string& append(InputIterator first, InputIterator last)
     {
-        if constexpr (intl::has_iter_category_convertible_to<Iterator, std::forward_iterator_tag>::value)
+        if constexpr (intl::has_iter_category_v<InputIterator, std::forward_iterator_tag>)
         {
             size_type const sz = size();
             size_type const cap = capacity();
@@ -638,7 +678,7 @@ public:
             if (n == 0)
                 return *this;
 
-            if constexpr (intl::is_trivial_contiguous_iterator<Iterator>::value)
+            if constexpr (intl::is_trivial_contiguous_iterator_v<InputIterator>)
             {
                 if (!address_in_range(*first))
                 {
@@ -699,7 +739,7 @@ public:
 
     basic_inplace_string& assign(basic_inplace_string const& str) noexcept { return *this = str; }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& assign(StringLike const& str)
     {
         auto const str_view = self_view(str);
@@ -713,7 +753,7 @@ public:
         return assign(str.data() + pos, std::min(n, str_size - pos));
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& assign(StringLike const& str, size_type pos, size_type n = npos)
     {
         auto const str_view = self_view(str);
@@ -734,7 +774,7 @@ public:
     basic_inplace_string& assign(CharT const* str)
     {
         QX_ASSERT_CONTRACT(str != nullptr, "basic_inplace_string::assign received nullptr");
-        return assign(str, traits_type::length(str)); 
+        return assign(str, traits_type::length(str));
     }
 
     basic_inplace_string& assign(size_type n, CharT c)
@@ -745,11 +785,10 @@ public:
         return *this;
     }
 
-    template <class Iterator>
+    template <class Iterator, std::enable_if_t<intl::has_iter_category_v<Iterator, std::input_iterator_tag>, int> = 0>
     basic_inplace_string& assign(Iterator first, Iterator last)
     {
-        if constexpr (intl::has_iter_category_convertible_to<Iterator, std::forward_iterator_tag>::value &&
-                      intl::is_trivial_contiguous_iterator<Iterator>::value)
+        if constexpr (intl::has_iter_category_v<Iterator, std::forward_iterator_tag> && intl::is_trivial_contiguous_iterator_v<Iterator>)
         {
             auto const n = static_cast<size_type>(std::distance(first, last));
             assign_trivial(first, last, n);
@@ -780,7 +819,7 @@ public:
         return insert(pos1, str.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& insert(size_type pos1, StringLike const& str, size_type pos2, size_type n2 = npos)
     {
         auto const str_view = self_view(str);
@@ -789,7 +828,7 @@ public:
         return insert(pos1, str_view.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
-    basic_inplace_string& insert(size_type pos, CharT const* str, size_type n = npos)
+    basic_inplace_string& insert(size_type pos, CharT const* str, size_type n)
     {
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::insert received nullptr");
         size_type sz = size();
@@ -851,10 +890,10 @@ public:
         return begin() + diff;
     }
 
-    template <class Iterator>
-    iterator insert(const_iterator pos, Iterator first, Iterator last)
+    template <class InputIterator, std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    iterator insert(const_iterator pos, InputIterator first, InputIterator last)
     {
-        if constexpr (intl::has_iter_category_convertible_to<Iterator, std::forward_iterator_tag>::value)
+        if constexpr (intl::has_iter_category_v<InputIterator, std::forward_iterator_tag>)
         {
             auto const n = static_cast<size_type>(std::distance(first, last));
             return insert_with_size(pos, first, last, n);
@@ -876,19 +915,18 @@ public:
         if (n == npos)
         {
             set_size_and_null_terminate(pos);
+            return *this;
         }
-        else
+
+        if (n > 0)
         {
-            if (n > 0)
-            {
-                size_type const sz = size();
-                pointer const ptr = data();
-                n = std::min(n, sz - pos);
-                size_type n_move = sz - pos - n;
-                if (n_move != 0)
-                    traits_type::move(ptr + pos, ptr + pos + n, n_move);
-                set_size_and_null_terminate(sz - n);
-            }
+            size_type const sz = size();
+            pointer const ptr = data();
+            n = std::min(n, sz - pos);
+            size_type n_move = sz - pos - n;
+            if (n_move != 0)
+                traits_type::move(ptr + pos, ptr + pos + n, n_move);
+            set_size_and_null_terminate(sz - n);
         }
         return *this;
     }
@@ -916,7 +954,7 @@ public:
         return replace(pos1, n1, str.data(), str.size());
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& replace(size_type pos1, size_type n1, StringLike const& str)
     {
         auto const str_view = self_view(str);
@@ -930,7 +968,7 @@ public:
         return replace(pos1, n1, str.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& replace(size_type pos1, size_type n1, StringLike const& str, size_type pos2, size_type n2 = npos)
     {
         auto const str_view = self_view(str);
@@ -1013,7 +1051,7 @@ public:
         return replace(static_cast<size_type>(it1 - begin()), static_cast<size_type>(it2 - it1), str.data(), str.size());
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     basic_inplace_string& replace(const_iterator it1, const_iterator it2, StringLike const& str)
     {
         auto const str_view = self_view(str);
@@ -1036,8 +1074,11 @@ public:
     }
 
     template <class Iterator>
-    basic_inplace_string& replace(const_iterator i1, const_iterator i2, Iterator j1,
-                                  Iterator j2); // constexpr since C++20
+    basic_inplace_string& replace(const_iterator i1, const_iterator i2, Iterator j1, Iterator j2)
+    {
+        basic_inplace_string const tmp(j1, j2);
+        return replace(i1, i2, tmp);
+    }
 
     // template <ContainterCompatibleRange<CharT> R>
     // constexpr basic_inplace_string& replace_with_range(const_iterator i1, const_iterator i2, R&& rg); // C++23
@@ -1058,23 +1099,14 @@ public:
 
     basic_inplace_string substr(size_type pos = 0, size_type n = npos) const { return basic_inplace_string(*this, pos, n); }
 
-    template <std::size_t M>
-    void swap(basic_inplace_string<M, CharT, Traits>& other) noexcept
+    void swap(basic_inplace_string& other) noexcept
     {
-        if constexpr (N != M)
-        {
-            QX_ASSERT_CONTRACT(size() <= M, "swap: source too large for target capacity");
-            QX_ASSERT_CONTRACT(other.size() <= N, "swap: target too large for source capacity");
-        }
-
         std::size_t const max_s = std::max(size(), other.size());
-
         std::swap_ranges(storage_.buffer.data(), storage_.buffer.data() + max_s, other.storage_.buffer.data());
         std::swap(storage_.size, other.storage_.size);
-
         // Maintain Null Terminators
-        Traits::assign(storage_.buffer[size()], CharT{});
-        Traits::assign(other.storage_.buffer[other.size()], CharT{});
+        traits_type::assign(storage_.buffer[size()], CharT{});
+        traits_type::assign(other.storage_.buffer[other.size()], CharT{});
     }
 
     // c_str, data
@@ -1087,7 +1119,7 @@ public:
 
     size_type find(basic_inplace_string const& str, size_type pos = 0) const noexcept { return find(str.data(), pos, str.size()); }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     size_type find(StringLike const& str, size_type pos = 0) const noexcept
     {
         auto const str_view = self_view(str);
@@ -1115,7 +1147,7 @@ public:
     size_type find(CharT const* str, size_type pos = 0) const noexcept
     {
         QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find(): received nullptr");
-        return find(str, pos, Traits::length(str)); 
+        return find(str, pos, Traits::length(str));
     }
 
     size_type find(CharT c, size_type pos = 0) const noexcept
@@ -1130,14 +1162,13 @@ public:
             return npos;
 
         return static_cast<size_type>(r - ptr);
-        ;
     }
 
     // rfind
 
     size_type rfind(basic_inplace_string const& str, size_type pos = npos) const noexcept { return rfind(str.data(), pos, str.size()); }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     size_type rfind(StringLike const& str, size_type pos = npos) const noexcept
     {
         auto const str_view = self_view(str);
@@ -1193,7 +1224,7 @@ public:
         return find_first_of(str.data(), pos, str.size());
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     size_type find_first_of(StringLike const& str, size_type pos = 0) const noexcept
     {
         auto const str_view = self_view(str);
@@ -1207,13 +1238,16 @@ public:
         size_type const sz = size();
         if (pos >= sz || n == 0)
             return npos;
-        const_pointer r = std::find_first_of(ptr + pos, ptr + sz, str, str + n, Traits::eq);
+        const_pointer r = std::find_first_of(ptr + pos, ptr + sz, str, str + n, traits_type::eq);
         if (r == ptr + sz)
             return npos;
         return static_cast<size_type>(r - ptr);
     }
 
-    size_type find_first_of(CharT const* str, size_type pos = 0) const noexcept { return find_first_of(str, pos, Traits::length(str)); }
+    size_type find_first_of(CharT const* str, size_type pos = 0) const noexcept
+    {
+        return find_first_of(str, pos, traits_type::length(str));
+    }
 
     size_type find_first_of(CharT c, size_type pos = 0) const noexcept { return find(c, pos); }
 
@@ -1224,7 +1258,7 @@ public:
         return find_last_of(str.data(), pos, str.size());
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     size_type find_last_of(StringLike const& str, size_type pos = npos) const noexcept
     {
         auto const str_view = self_view(str);
@@ -1246,7 +1280,7 @@ public:
 
             for (const_pointer ps = ptr + pos; ps != ptr;)
             {
-                CharT const* r = Traits::find(str, n, *--ps);
+                const_pointer r = traits_type::find(str, n, *--ps);
                 if (r)
                     return static_cast<size_type>(r - ptr);
             }
@@ -1254,7 +1288,10 @@ public:
         return npos;
     }
 
-    size_type find_last_of(CharT const* str, size_type pos = npos) const noexcept { return find_last_of(str, pos, Traits::length(str)); }
+    size_type find_last_of(CharT const* str, size_type pos = npos) const noexcept
+    {
+        return find_last_of(str, pos, traits_type::length(str));
+    }
 
     size_type find_last_of(CharT c, size_type pos = npos) const noexcept { return rfind(c, pos); }
 
@@ -1265,7 +1302,7 @@ public:
         return find_first_not_of(str.data(), pos, str.size());
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     size_type find_first_not_of(StringLike const& str, size_type pos = 0) const noexcept
     {
         auto const str_view = self_view(str);
@@ -1282,7 +1319,7 @@ public:
         const_pointer pe = ptr + sz;
         for (const_pointer ps = ptr + pos; ps != pe; ++ps)
         {
-            if (Traits::find(str, n, *ps) == nullptr)
+            if (traits_type::find(str, n, *ps) == nullptr)
                 return static_cast<size_type>(ps - ptr);
         }
         return npos;
@@ -1291,7 +1328,7 @@ public:
     size_type find_first_not_of(CharT const* str, size_type pos = 0) const noexcept
     {
         QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find_first_not_of(): received nullptr");
-        return find_first_not_of(str, pos, Traits::length(str));
+        return find_first_not_of(str, pos, traits_type::length(str));
     }
 
     size_type find_first_not_of(CharT c, size_type pos = 0) const noexcept
@@ -1303,7 +1340,7 @@ public:
             value_type const* pe = ptr + sz;
             for (value_type const* ps = ptr + pos; ps != pe; ++ps)
             {
-                if (!Traits::eq(*ps, c))
+                if (!traits_type::eq(*ps, c))
                     return static_cast<size_type>(ps - ptr);
             }
         }
@@ -1317,7 +1354,7 @@ public:
         return find_last_not_of(str.data(), pos, str.size());
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     size_type find_last_not_of(StringLike const& str, size_type pos = npos) const noexcept
     {
         auto const str_view = self_view(str);
@@ -1337,7 +1374,7 @@ public:
 
         for (value_type const* ps = ptr + pos; ps != ptr;)
         {
-            if (Traits::find(str, n, *--ps) == nullptr)
+            if (traits_type::find(str, n, *--ps) == nullptr)
                 return static_cast<size_type>(ps - ptr);
         }
         return npos;
@@ -1346,7 +1383,7 @@ public:
     size_type find_last_not_of(CharT const* str, size_type pos = npos) const noexcept
     {
         QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find_last_not_of(): received nullptr");
-        return find_last_not_of(str, pos, Traits::length(str));
+        return find_last_not_of(str, pos, traits_type::length(str));
     }
 
     size_type find_last_not_of(CharT c, size_type pos = npos) const noexcept
@@ -1360,7 +1397,7 @@ public:
 
         for (value_type const* ps = ptr + pos; ps != ptr;)
         {
-            if (!Traits::eq(*--ps, c))
+            if (!traits_type::eq(*--ps, c))
                 return static_cast<size_type>(ps - ptr);
         }
         return pos;
@@ -1370,13 +1407,13 @@ public:
 
     int compare(basic_inplace_string const& str) const noexcept { return compare(self_view(str)); }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     int compare(StringLike const& str) const noexcept
     {
         auto const str_view = self_view(str);
         size_type const lhs_sz = size();
         size_type const rhs_sz = str_view.size();
-        int const result = Traits::compare(data(), str_view.data(), std::min(lhs_sz, rhs_sz));
+        int const result = traits_type::compare(data(), str_view.data(), std::min(lhs_sz, rhs_sz));
         if (result != 0)
             return result;
         if (lhs_sz < rhs_sz)
@@ -1388,7 +1425,7 @@ public:
 
     int compare(size_type pos1, size_type n1, basic_inplace_string const& str) const { return compare(pos1, n1, str.data(), str.size()); }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     int compare(size_type pos1, size_type n1, StringLike const& str) const
     {
         auto const str_view = self_view(str);
@@ -1400,7 +1437,7 @@ public:
         return compare(pos1, n1, self_view(str), pos2, n2);
     }
 
-    template <class StringLike, enable_if_string_like_t<StringLike> = 0>
+    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     int compare(size_type pos1, size_type n1, StringLike const& str, size_type pos2, size_type n2 = npos) const
     {
         auto const str_view = self_view(str);
@@ -1410,7 +1447,7 @@ public:
     int compare(CharT const* str) const noexcept
     {
         QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::compare(): received nullptr");
-        return compare(0, npos, str, Traits::length(str));
+        return compare(0, npos, str, traits_type::length(str));
     }
 
     int compare(size_type pos1, size_type n1, CharT const* str) const
@@ -1447,7 +1484,7 @@ public:
         return self_view(data(), size()).starts_with(sv);
     }
 
-    constexpr bool starts_with(CharT c) const noexcept { return !empty() && Traits::eq(front(), c); }
+    constexpr bool starts_with(CharT c) const noexcept { return !empty() && traits_type::eq(front(), c); }
 
     constexpr bool starts_with(CharT const* str) const { return starts_with(self_view(str)); }
 
@@ -1455,7 +1492,7 @@ public:
 
     constexpr bool ends_with(std::basic_string_view<CharT, Traits> sv) const noexcept { return self_view(data(), size()).ends_with(sv); }
 
-    constexpr bool ends_with(CharT c) const noexcept { return !empty() && Traits::eq(back(), c); }
+    constexpr bool ends_with(CharT c) const noexcept { return !empty() && traits_type::eq(back(), c); }
 
     constexpr bool ends_with(CharT const* str) const { return ends_with(self_view(str)); }
 
@@ -1495,10 +1532,10 @@ private:
         set_size_and_null_terminate(n);
     }
 
-    template <class Iterator>
-    void init(Iterator first, Iterator last)
+    template <class InputIterator>
+    void init(InputIterator first, InputIterator last)
     {
-        if constexpr (intl::has_iter_category_convertible_to<Iterator, std::forward_iterator_tag>::value)
+        if constexpr (intl::has_iter_category_v<InputIterator, std::forward_iterator_tag>)
         {
             auto const sz = static_cast<size_type>(std::distance(first, last));
             init_with_size(std::move(first), std::move(last), sz);
@@ -1520,8 +1557,7 @@ private:
     template <class Iterator, class Sentinel>
     void assign_trivial(Iterator first, Sentinel /*last*/, size_type n)
     {
-        QX_ASSERT_CONTRACT(intl::is_trivial_contiguous_iterator<Iterator>::value,
-                           "The iterator type given to `assign_trivial` must be trivial");
+        QX_ASSERT_CONTRACT(intl::is_trivial_contiguous_iterator_v<Iterator>, "The iterator type given to `assign_trivial` must be trivial");
 
         const_pointer const src = to_address(first);
         pointer const dst = data();
@@ -1573,14 +1609,14 @@ private:
         if (n == 0)
             return begin() + ip;
 
-        if (intl::is_trivial_contiguous_iterator<Iterator>::value && !address_in_range(*first))
+        if (intl::is_trivial_contiguous_iterator_v<Iterator> && !address_in_range(*first))
         {
-            return insert_from_safe_copy(ip, pos, std::move(first), std::move(last));
+            return insert_from_safe_copy(n, ip, std::move(first), std::move(last));
         }
 
         basic_inplace_string tmp;
         tmp.init_with_sentinel(std::move(first), std::move(last));
-        return insert_from_safe_copy(ip, pos, tmp.begin(), tmp.end());
+        return insert_from_safe_copy(n, ip, tmp.begin(), tmp.end());
     }
 
     template <class ForwardIterator, class Sentinel>
@@ -1602,6 +1638,12 @@ private:
         return begin() + ip;
     }
 
+    void erase_to_end(size_type pos)
+    {
+        QX_ASSERT_CONTRACT(pos <= capacity(), "Trying to erase at position outside the strings capacity!");
+        set_size_and_null_terminate(pos);
+    }
+
     template <class T>
     bool address_in_range(T const& c) const
     {
@@ -1611,8 +1653,7 @@ private:
     template <class Iterator, class Sentinel>
     static value_type* copy_non_overlapping_range(Iterator first, Sentinel last, value_type* dest)
     {
-        using iterator_value_type = remove_cvref_t<decltype(*first)>;
-        if constexpr (intl::is_contiguous_iterator<Iterator>::value && std::is_same_v<value_type, iterator_value_type> &&
+        if constexpr (intl::is_contiguous_iterator<Iterator>::value && std::is_same_v<value_type, intl::iter_value_t<Iterator>> &&
                       std::is_same_v<Iterator, Sentinel>)
         {
             QX_ASSERT_CONTRACT(!intl::is_overlapping_range(to_address(first), to_address(last), dest),
@@ -1840,9 +1881,8 @@ inline bool operator>=(CharT const* lhs, basic_inplace_string<N, CharT, Traits> 
 
 // swap
 
-template <std::size_t N, class CharT, class Traits, std::size_t M>
-inline void swap(basic_inplace_string<N, CharT, Traits>& lhs,
-                 basic_inplace_string<M, CharT, Traits>& rhs) noexcept(noexcept(lhs.swap(rhs)))
+template <std::size_t N, class CharT, class Traits>
+inline void swap(basic_inplace_string<N, CharT, Traits>& lhs, basic_inplace_string<N, CharT, Traits>& rhs) noexcept
 {
     lhs.swap(rhs);
 }
