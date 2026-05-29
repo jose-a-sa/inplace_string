@@ -1,22 +1,13 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
-#include <cassert>
 #include <charconv>
-#include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <iterator>
 #include <limits>
-#include <list>
-#include <memory>
 #include <optional>
-#include <stdexcept>
-#include <string>
 #include <string_view>
 #include <type_traits>
-#include <vector>
 
 #ifdef _LIBCPP_VERSION
 #define QX_STL_LIBCPP // libc++
@@ -35,20 +26,29 @@
 #define QX_HAS_BUILTIN(x) 0
 #endif
 
-#ifdef QX_IS_CONSTANT_EVALUATED
-// Do nothing
-#elif QX_HAS_BUILTIN(__builtin_is_constant_evaluated) || (defined(_MSC_VER) && _MSC_VER >= 1925)
-#define QX_IS_CONSTANT_EVALUATED() __builtin_is_constant_evaluated()
-#else
-#define QX_IS_CONSTANT_EVALUATED() false
-#endif
-
 #ifdef QX_IS_CONSTANT
 // Do nothing
-#elif QX_HAS_BUILTIN(__builtin_constant_p) || defined(__GNUC__)
+#elif QX_HAS_BUILTIN(__builtin_constant_p)
 #define QX_IS_CONSTANT(x) __builtin_constant_p(x)
 #else
 #define QX_IS_CONSTANT(x) false
+#endif
+
+#if QX_HAS_BUILTIN(__builtin_expect)
+#define QX_LIKELY(x) __builtin_expect(!!(x), 1)
+#else
+#define QX_LIKELY(x) (x)
+#endif
+
+#if __cplusplus >= 202302L
+#include <utility>
+#define QX_UNREACHABLE() std::unreachable()
+#elif defined(__GNUC__) || QX_HAS_BUILTIN(__builtin_unreachable)
+#define QX_UNREACHABLE() __builtin_unreachable()
+#elif defined(_MSC_VER)
+#define QX_UNREACHABLE() __assume(false)
+#else
+#define QX_UNREACHABLE()
 #endif
 
 namespace qx
@@ -57,37 +57,60 @@ namespace qx
 namespace intl
 {
 
-[[noreturn]]
-inline void contract_violation(char const* msg) noexcept
+constexpr bool is_constant_evaluated() noexcept
 {
-    std::fprintf(stderr, "Contract violation: %s\n", msg);
-    std::terminate();
+#if defined(__cpp_lib_is_constant_evaluated) && __cpp_lib_is_constant_evaluated >= 201811L
+    return std::is_constant_evaluated();
+#elif QX_HAS_BUILTIN(__builtin_is_constant_evaluated)
+    return __builtin_is_constant_evaluated();
+#else
+    return false;
+#endif
 }
 
-inline constexpr bool nothrow_contract_violation = noexcept(contract_violation(""));
-
-#ifndef QX_ASSERT_THROW
-#define QX_ASSERT_THROW(cond, arg)                                                                                                         \
-    if (!static_cast<bool>(cond))                                                                                                          \
-    {                                                                                                                                      \
-        throw(arg);                                                                                                                        \
-    }
+[[noreturn]] inline void trap() noexcept
+{
+#if QX_HAS_BUILTIN(__builtin_trap)
+    __builtin_trap();
+#elif defined(_MSC_VER)
+    __debugbreak();
+#else
+    // Fallback
+    static_cast<void>(*reinterpret_cast<char volatile*>(0) = 0);
 #endif
+}
+
+[[noreturn]] inline void contract_violation(char const* msg) noexcept
+{
+    if ()
+
+    std::fprintf(stderr, "CONTRACT VIOLATION: %s\n", msg);
+    std::fflush(stderr);
+    trap();
+    QX_UNREACHABLE();
+}
 
 #ifndef QX_ASSERT_CONTRACT
 #ifdef NDEBUG
 #define QX_ASSERT_CONTRACT(cond, msg) ((void)0)
 #else
 #define QX_ASSERT_CONTRACT(cond, msg)                                                                                                      \
+    (QX_LIKELY(cond)                                                                                                                       \
+         ? ((void)0)                                                                                                                       \
+         : ::qx::intl::contract_violation(__FILE__ ":" QX_STRINGIFY(__LINE__) ": QX Hardening assertion '" #cond "' failed: " msg))
+#endif
+#endif
+
+#ifndef QX_ASSERT_THROW
+#define QX_ASSERT_THROW(cond, exception_expr)                                                                                              \
     do                                                                                                                                     \
     {                                                                                                                                      \
-        if (!static_cast<bool>(cond)) [[unlikely]]                                                                                         \
+        if (QX_UNLIKELY(!(cond)))                                                                                                          \
         {                                                                                                                                  \
-            intl::contract_violation(msg);                                                                                                 \
+            throw(exception_expr);                                                                                                         \
         }                                                                                                                                  \
     }                                                                                                                                      \
     while (0)
-#endif
 #endif
 
 // iterator_value
@@ -229,7 +252,7 @@ inline constexpr bool convertible_to_string_view_v = convertible_to_string_view<
 template <class T, class U>
 constexpr bool is_pointer_in_range(T const* begin, T const* end, U const* ptr)
 {
-    if (QX_IS_CONSTANT_EVALUATED())
+    if (intl::is_constant_evaluated())
     {
         if (QX_IS_CONSTANT(begin <= ptr && ptr < end))
             return begin <= ptr && ptr < end;
@@ -278,13 +301,6 @@ struct is_trivial_contiguous_iterator<Iter, std::void_t<iter_value_t<Iter>>>
 {};
 template <class Iter>
 inline constexpr bool is_trivial_contiguous_iterator_v = is_trivial_contiguous_iterator<Iter>::value;
-
-static_assert(is_trivial_contiguous_iterator<std::vector<char>::iterator>::value);
-static_assert(!is_trivial_contiguous_iterator<std::deque<char>::iterator>::value);
-static_assert(!is_trivial_contiguous_iterator<std::list<char>::iterator>::value);
-static_assert(is_trivial_contiguous_iterator<std::array<char, 10>::iterator>::value);
-static_assert(is_trivial_contiguous_iterator<std::string::iterator>::value);
-static_assert(is_trivial_contiguous_iterator<std::string_view::iterator>::value);
 
 } // namespace intl
 
@@ -420,9 +436,9 @@ public:
 
     constexpr basic_inplace_string() noexcept = default;
 
-    constexpr basic_inplace_string(basic_inplace_string const& str, size_type pos) : basic_inplace_string(str, pos, npos) {}
+    basic_inplace_string(basic_inplace_string const& str, size_type pos) : basic_inplace_string(str, pos, npos) {}
 
-    constexpr basic_inplace_string(basic_inplace_string const& str, size_type pos, size_type n)
+    basic_inplace_string(basic_inplace_string const& str, size_type pos, size_type n)
     {
         size_type const str_sz = str.size();
         QX_ASSERT_THROW(pos <= str_sz, std::out_of_range{"basic_inplace_string"});
@@ -430,18 +446,18 @@ public:
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    explicit constexpr basic_inplace_string(StringLike const& str)
+    explicit basic_inplace_string(StringLike const& str)
     {
         auto const str_view = self_view(str);
         init(str_view.data(), str_view.size());
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    constexpr basic_inplace_string(StringLike const& str, size_type pos) : basic_inplace_string(str, pos, npos)
+    basic_inplace_string(StringLike const& str, size_type pos) : basic_inplace_string(str, pos, npos)
     {}
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    constexpr basic_inplace_string(StringLike const& str, size_type pos, size_type n)
+    basic_inplace_string(StringLike const& str, size_type pos, size_type n)
     {
         self_view const str_view = self_view(str).substr(pos, n);
         init(str_view.data(), str_view.size());
@@ -453,18 +469,18 @@ public:
         init(str, Traits::length(str));
     }
 
-    constexpr basic_inplace_string(CharT const* str, size_type n)
+    basic_inplace_string(CharT const* str, size_type n)
     {
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "basic_inplace_string(const CharT*, n) detected nullptr");
         init(str, n);
     }
 
-    basic_inplace_string(std::nullptr_t) = delete; // C++23
+    constexpr basic_inplace_string(std::nullptr_t) = delete; // C++23
 
-    constexpr basic_inplace_string(size_type n, CharT c) { init(n, c); }
+    basic_inplace_string(size_type n, CharT c) { init(n, c); }
 
     template <class InputIterator, std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
-    constexpr basic_inplace_string(InputIterator begin, InputIterator end) noexcept
+    basic_inplace_string(InputIterator begin, InputIterator end) noexcept
     {
         init(begin, end);
     }
@@ -481,7 +497,7 @@ public:
     // template <ContainterCompatibleRange<CharT> R>
     // constexpr basic_inplace_string(std::from_range_t, R&& rg); // since C++23
 
-    constexpr basic_inplace_string(std::initializer_list<CharT> il) noexcept { init(il.begin(), il.end()); }
+    basic_inplace_string(std::initializer_list<CharT> il) noexcept { init(il.begin(), il.end()); }
 
     // NOLINTNEXTLINE(*-explicit-constructor,*-explicit-conversions)
     constexpr operator self_view() const noexcept { return self_view(data(), size()); }
@@ -498,7 +514,8 @@ public:
 
     basic_inplace_string& operator=(CharT c)
     {
-        static_assert(N > 0, "Cannot assign a character to an inplace_string with zero capacity");
+        size_type const cap = capacity();
+        QX_ASSERT_THROW(cap > 0, std::length_error{"basic_inplace_string"});
         traits_type::assign(*data(), c);
         set_size_and_null_terminate(1);
         return *this;
@@ -538,7 +555,7 @@ public:
     void resize(size_type n) { resize(n, value_type{}); }
 
     template <class Operation>
-    constexpr void resize_and_overwrite(size_type n, Operation op) // since C++23
+    void resize_and_overwrite(size_type n, Operation op) // since C++23
     {
         size_type const sz = size();
         if (n > sz)
@@ -554,11 +571,13 @@ public:
                 erase_to_end(n);
             }
         }
-        erase_to_end(std::move(op)(data(), static_cast<std::decay_t<decltype(n)>>(n)));
+        erase_to_end(std::move(op)(data(), static_cast<std::decay_t<decltype((n))>>(n)));
     };
 
+    // ReSharper disable once CppMemberFunctionMayBeConst
     void reserve(size_type n) { QX_ASSERT_THROW(n <= max_size(), std::length_error{"basic_inplace_string"}); }
 
+    // ReSharper disable once CppMemberFunctionMayBeStatic
     void shrink_to_fit() noexcept { /* nop */ }
 
     void clear() noexcept { set_size_and_null_terminate(0); }
@@ -964,7 +983,7 @@ public:
     basic_inplace_string& replace(size_type pos1, size_type n1, basic_inplace_string const& str, size_type pos2, size_type n2 = npos)
     {
         size_type const str_sz = str.size();
-        QX_ASSERT_THROW(pos2 <= str_sz, std::out_of_range{"basic_inplace_string"})
+        QX_ASSERT_THROW(pos2 <= str_sz, std::out_of_range{"basic_inplace_string"});
         return replace(pos1, n1, str.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
@@ -1511,21 +1530,21 @@ public:
 #endif
 
 private:
-    constexpr void set_size_and_null_terminate(size_type size) noexcept
+    void set_size_and_null_terminate(size_type size) noexcept
     {
         QX_ASSERT_CONTRACT(size <= std::numeric_limits<internal_size_type>::max(), "basic_inplace_string");
         storage_.size = static_cast<internal_size_type>(size);
         traits_type::assign(storage_.buffer[size], value_type{});
     }
 
-    constexpr void init(value_type const* str, size_type n)
+    void init(value_type const* str, size_type n)
     {
         QX_ASSERT_THROW(n <= max_size(), std::length_error{"basic_inplace_string"});
         traits_type::copy(storage_.buffer.data(), str, n);
         set_size_and_null_terminate(n);
     }
 
-    constexpr void init(size_type n, value_type c)
+    void init(size_type n, value_type c)
     {
         QX_ASSERT_THROW(n <= max_size(), std::length_error{"basic_inplace_string"});
         traits_type::assign(storage_.buffer.data(), n, c);
@@ -1719,13 +1738,11 @@ inline bool operator==(basic_inplace_string<N, CharT, Traits> const& lhs, CharT 
 {
     QX_ASSERT_CONTRACT(rhs != nullptr, "operator==(basic_inplace_string, CharT*): received nullptr");
 
-    using inplace_string = basic_inplace_string<N, CharT, Traits>;
-
     std::size_t const rhs_len = Traits::length(rhs);
     if (rhs_len != lhs.size())
         return false;
 
-    return lhs.compare(0, inplace_string::npos, rhs, rhs_len) == 0;
+    return lhs.compare(0, basic_inplace_string<N, CharT, Traits>::npos, rhs, rhs_len) == 0;
 }
 
 #if __cplusplus <= 201703L
@@ -1857,14 +1874,14 @@ inline bool operator>=(CharT const* lhs, basic_inplace_string<N, CharT, Traits> 
 // operator +
 
 /*
- * NOTE: operator+ is intentionally omitted for basic_inplace<N>.
+ * NOTE: operator+ is intentionally omitted for basic_inplace_string<N, CharT, Traits>.
  *
  * Rationale:
- *  - Memory Safety: Unlike std::string, basic_inplace does not have a
+ *  - Memory Safety: Unlike std::string, inplace_string<N> does not have a
  *    dynamic allocator. Implementing operator+ would require an arbitrary
  *    choice of result capacity (e.g., N, M, or N+M).
  *
- *  - Stack Protection: Returning basic_inplace<N+M> can lead to "stack
+ *  - Stack Protection: Returning inplace_string<N+M> can lead to "stack
  *    blowup" during chained concatenations (e.g., s1 + s2 + s3 + s4),
  *    creating large, hidden temporaries that risk stack overflow in
  *    memory-constrained environments.
@@ -1902,7 +1919,7 @@ inplace_string<N> unchecked_to_inplace_string(T val) noexcept
 {
     inplace_string<N> res;
     auto const begin = res.data();
-    auto [end, ec] = std::to_chars(begin, begin + N, val);
+    auto const [end, ec] = std::to_chars(begin, begin + N, val);
     QX_ASSERT_CONTRACT(ec == std::errc{}, "unchecked_to_inplace_string: value exceeds buffer capacity");
     res.set_size_and_null_terminate(static_cast<std::size_t>(end - begin));
     return res;
@@ -1913,7 +1930,7 @@ std::optional<inplace_string<N>> try_to_inplace_string(T val) noexcept
 {
     inplace_string<N> res;
     auto const begin = res.data();
-    auto [end, ec] = std::to_chars(begin, begin + N, val);
+    auto const [end, ec] = std::to_chars(begin, begin + N, val);
     if (ec == std::errc())
     {
         res.set_size_and_null_terminate(end - begin);

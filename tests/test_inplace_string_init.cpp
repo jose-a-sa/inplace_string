@@ -1,6 +1,17 @@
+#include <qx/inplace_string.h>
+
 #include <gtest/gtest.h>
 
-#include <qx/inplace_string.h>
+#include <vector>
+#include <deque>
+#include <list>
+
+static_assert(qx::intl::is_trivial_contiguous_iterator<std::vector<char>::iterator>::value);
+static_assert(!qx::intl::is_trivial_contiguous_iterator<std::deque<char>::iterator>::value);
+static_assert(!qx::intl::is_trivial_contiguous_iterator<std::list<char>::iterator>::value);
+static_assert(qx::intl::is_trivial_contiguous_iterator<std::array<char, 10>::iterator>::value);
+static_assert(qx::intl::is_trivial_contiguous_iterator<std::string::iterator>::value);
+static_assert(qx::intl::is_trivial_contiguous_iterator<std::string_view::iterator>::value);
 
 TEST(InplaceStringInitTest, DefaultConstructor)
 {

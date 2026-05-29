@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
 #include <qx/inplace_string.h>
+
+#include <gtest/gtest.h>
 
 TEST(InplaceStringEraseTest, EraseMiddle)
 {
