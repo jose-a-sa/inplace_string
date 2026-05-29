@@ -1,10 +1,9 @@
-#include "gtest/gtest.h"
-#include <cstdint>
+#include <qx/inplace_string.h>
+
 #include <gmock/gmock.h>
 
+#include <cstdint>
 #include <initializer_list>
-
-#include <qx/inplace_string.h>
 #include <stdexcept>
 #include <string_view>
 

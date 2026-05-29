@@ -26,4 +26,5 @@ Checks: >
     -cppcoreguidelines-pro-bounds-pointer-arithmetic,
     -google-readability-braces-around-statements,
     -bugprone-easily-swappable-parameters,
-    -readability-identifier-length
+    -readability-identifier-length,
+    -cppcoreguidelines-macro-usage
