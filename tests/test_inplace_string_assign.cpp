@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include <iterator>
 #include <qx/inplace_string.h>
 
 TEST(InplaceStringTest, AssignString)
