@@ -54,7 +54,7 @@ foreach(_test_file IN LISTS _qx_tests)
   target_link_libraries("${_test_name}"
     PRIVATE
     gmock_main
-    fmt::fmt
+    fmt::fmt-header-only
     qx::inplace_string
   )
   target_include_directories("${_test_name}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
