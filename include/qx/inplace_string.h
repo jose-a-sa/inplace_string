@@ -692,15 +692,12 @@ public:
             if (n == 0)
                 return *this;
 
-            if constexpr (intl::is_trivial_contiguous_iterator_v<InputIterator>)
+            if (intl::is_trivial_contiguous_iterator_v<InputIterator> && !address_in_range(*first))
             {
-                if (!address_in_range(*first))
-                {
-                    QX_ASSERT_THROW(n <= cap - sz, std::length_error{"basic_inplace_string"});
-                    copy_non_overlapping_range(first, last, data() + sz);
-                    set_size_and_null_terminate(sz + n);
-                    return *this;
-                }
+                QX_ASSERT_THROW(n <= cap - sz, std::length_error{"basic_inplace_string"});
+                copy_non_overlapping_range(first, last, data() + sz);
+                set_size_and_null_terminate(sz + n);
+                return *this;
             }
         }
 
@@ -1125,9 +1122,9 @@ public:
 
     // c_str, data
 
-    CharT const* c_str() const noexcept { return data(); }
-    CharT const* data() const noexcept { return storage_.buffer.data(); }
-    CharT* data() noexcept { return storage_.buffer.data(); }
+    constexpr CharT const* c_str() const noexcept { return data(); }
+    constexpr CharT const* data() const noexcept { return storage_.buffer.data(); }
+    constexpr CharT* data() noexcept { return storage_.buffer.data(); }
 
     // find
 
