@@ -1,6 +1,9 @@
+
 #include <qx/inplace_string.h>
 
 #include <gtest/gtest.h>
+
+#include "string_api_tester.h"
 
 TEST(InplaceStringSearchTest, FindSubstring)
 {
@@ -55,12 +58,13 @@ TEST(InplaceStringCompareTest, RelationalOperators)
 TEST(InplaceStringSearchGapsTest, FindFirstNotOfAndFindLastOf)
 {
     qx::inplace_string<20> const s("hello world");
+    auto const tester = qx::string_api_tester(s);
 
     // find_first_not_of matches first char not present in target set
-    EXPECT_EQ(s.find_first_not_of("helo"), 5); // index of space ' '
-    EXPECT_EQ(s.find_first_not_of("hello world"), qx::inplace_string<20>::npos);
+    tester.result_eq([](auto& s) { return s.find_first_not_of("helo"); }, 5);
+    tester.result_eq([](auto& s) { return s.find_first_not_of("hello world"); }, qx::inplace_string<20>::npos);
 
     // find_last_of scans backwards for matching characters in set
-    EXPECT_EQ(s.find_last_of("aeiou"), 7); // index of second 'o'
-    EXPECT_EQ(s.find_last_of("xyz"), qx::inplace_string<20>::npos);
+    tester.result_eq([](auto& s) { return s.find_last_of("aeiou"); }, 7);
+    tester.result_eq([](auto& s) { return s.find_last_of("xyz"); }, qx::inplace_string<20>::npos);
 }

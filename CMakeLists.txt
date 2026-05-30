@@ -57,6 +57,7 @@ foreach(_test_file IN LISTS _qx_tests)
     fmt::fmt
     qx::inplace_string
   )
+  target_include_directories("${_test_name}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
   gtest_discover_tests("${_test_name}")
   list(APPEND _qx_testnames "${_test_name}")
 endforeach()

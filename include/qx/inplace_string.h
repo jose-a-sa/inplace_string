@@ -80,13 +80,8 @@ constexpr bool is_constant_evaluated() noexcept
 #endif
 }
 
-// NOLINTNEXTLINE(bugprone-exception-escape)
-QX_FORCE_INLINE constexpr void contract_violation(char const* msg) noexcept
+QX_FORCE_INLINE void v_contract_violation(char const* msg) noexcept
 {
-    if (is_constant_evaluated())
-    {
-        throw msg; // NOLINT(hicpp-exception-baseclass, misc-throw-by-value-catch-by-reference)
-    }
     std::fprintf(stderr, "%s\n", msg); // NOLINT(*-vararg)
     std::fflush(stderr);
 }
@@ -98,7 +93,7 @@ QX_FORCE_INLINE constexpr void contract_violation(char const* msg) noexcept
 #define QX_ASSERT_CONTRACT(cond, msg)                                                                                                      \
     (QX_LIKELY(cond)                                                                                                                       \
          ? ((void)0)                                                                                                                       \
-         : (::qx::intl::contract_violation(__FILE__ ":" QX_STRINGIFY(__LINE__) ": Contract violation: '" #cond "' failed: " msg),          \
+         : (::qx::intl::v_contract_violation(__FILE__ ":" QX_STRINGIFY(__LINE__) ": Contract violation: '" #cond "' failed: " msg),        \
             QX_TRAP()))
 #endif
 #endif
@@ -582,7 +577,7 @@ public:
 
     void clear() noexcept { set_size_and_null_terminate(0); }
 
-    [[nodiscard]] bool empty() const noexcept { return size() == 0; }
+    [[nodiscard]] constexpr bool empty() const noexcept { return size() == 0; }
 
     const_reference operator[](size_type pos) const noexcept
     {
