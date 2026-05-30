@@ -22,7 +22,10 @@ template <class TestingStr>
 class string_api_tester
 {
 public:
-    explicit constexpr string_api_tester(TestingStr& test_src) noexcept : test_src_{test_src}, expected_str_(std::string_view(test_src)) {}
+    explicit constexpr string_api_tester(TestingStr& test_src) noexcept
+        : str_proxy_{test_src}
+        , str_(std::string_view(test_src))
+    {}
 
     string_api_tester(string_api_tester const&) = delete;
     string_api_tester& operator=(string_api_tester const&) = delete;
@@ -31,51 +34,59 @@ public:
     ~string_api_tester() = default;
 
     template <class Func>
-    void result_eq(Func func)
+    string_api_tester& result_eq(Func func)
     {
-        auto const expected = func(expected_str_);
-        auto const actual = func(test_src_);
-        EXPECT_THAT(actual, TesterResultMatcher(expected));
+        result_eq_cmp(func(str_), func(str_proxy_));
+        return *this;
     }
 
     template <class Func>
-    void result_eq(Func func) const
+    string_api_tester const& result_eq(Func func) const
     {
-        auto const expected = func(expected_str_);
-        auto const actual = func(test_src_);
-        EXPECT_THAT(actual, TesterResultMatcher(expected));
+        result_eq_cmp(func(str_), func(str_proxy_));
+        return *this;
     }
 
     template <class Func, class Result>
-    void result_eq(Func func, Result res)
+    string_api_tester& result_eq(Func func, Result res)
     {
-        auto const expected = func(expected_str_);
-        auto const actual = func(test_src_);
-        EXPECT_THAT(actual, TesterResultMatcher(expected));
-        EXPECT_EQ(expected, res);
+        result_eq_cmp(func(str_), func(str_proxy_), std::move(res));
+        return *this;
     }
 
     template <class Func, class Result>
-    void result_eq(Func func, Result res) const
+    string_api_tester const& result_eq(Func func, Result res) const
     {
-        auto const expected = func(expected_str_);
-        auto const actual = func(test_src_);
-        EXPECT_THAT(actual, TesterResultMatcher(expected));
-        EXPECT_EQ(expected, res);
+        result_eq_cmp(func(str_), func(str_proxy_), std::move(res));
+        return *this;
     }
 
     template <class Func>
-    void self_eq(Func func)
+    string_api_tester& self_eq(Func func)
     {
-        func(expected_str_);
-        func(test_src_);
-        EXPECT_EQ(test_src_.size(), expected_str_.size());
-        EXPECT_STREQ(test_src_.c_str(), expected_str_.c_str());
+        func(str_);
+        func(str_proxy_);
+        EXPECT_EQ(str_proxy_.size(), str_.size());
+        EXPECT_STREQ(str_proxy_.c_str(), str_.c_str());
+        return *this;
     }
 
 private:
-    TestingStr& test_src_;
-    std::string expected_str_;
+    TestingStr& str_proxy_;
+    std::string str_;
+
+    template <class ProxyRes, class StrRes>
+    static void result_eq_cmp(ProxyRes proxy_res, StrRes str_res)
+    {
+        EXPECT_THAT(proxy_res, TesterResultMatcher(str_res));
+    }
+
+    template <class StrRes, class ProxyRes, class ExpectedRes>
+    static void result_eq_cmp(StrRes str_res, ProxyRes proxy_res, ExpectedRes expected_res)
+    {
+        EXPECT_THAT(proxy_res, TesterResultMatcher(str_res));
+        EXPECT_EQ(proxy_res, expected_res);
+    }
 };
 
 } // namespace qx
