@@ -447,7 +447,9 @@ public:
 
     constexpr basic_inplace_string() noexcept = default;
 
-    basic_inplace_string(basic_inplace_string const& str, size_type pos) : basic_inplace_string(str, pos, npos) {}
+    basic_inplace_string(basic_inplace_string const& str, size_type pos)
+        : basic_inplace_string(str, pos, npos)
+    {}
 
     basic_inplace_string(basic_inplace_string const& str, size_type pos, size_type n)
     {
@@ -464,7 +466,8 @@ public:
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    basic_inplace_string(StringLike const& str, size_type pos) : basic_inplace_string(str, pos, npos)
+    basic_inplace_string(StringLike const& str, size_type pos)
+        : basic_inplace_string(str, pos, npos)
     {}
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>

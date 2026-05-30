@@ -8,6 +8,10 @@ AccessModifierOffset: -4
 UseTab: Never
 ContinuationIndentWidth: 4
 
+AllowShortFunctionsOnASingleLine: InlineOnly
+PackConstructorInitializers: Never 
+BreakConstructorInitializers: BeforeComma
+
 # ConstructorInitializerIndentWidth: 4
 # BreakConstructorInitializers: BeforeColon
 # PackConstructorInitializers: Never
