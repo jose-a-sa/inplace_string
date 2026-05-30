@@ -51,3 +51,16 @@ TEST(InplaceStringCompareTest, RelationalOperators)
     EXPECT_TRUE(s2 > s1);
     EXPECT_TRUE(s1 <= s2);
 }
+
+TEST(InplaceStringSearchGapsTest, FindFirstNotOfAndFindLastOf)
+{
+    qx::inplace_string<20> const s("hello world");
+
+    // find_first_not_of matches first char not present in target set
+    EXPECT_EQ(s.find_first_not_of("helo"), 5); // index of space ' '
+    EXPECT_EQ(s.find_first_not_of("hello world"), qx::inplace_string<20>::npos);
+
+    // find_last_of scans backwards for matching characters in set
+    EXPECT_EQ(s.find_last_of("aeiou"), 7); // index of second 'o'
+    EXPECT_EQ(s.find_last_of("xyz"), qx::inplace_string<20>::npos);
+}

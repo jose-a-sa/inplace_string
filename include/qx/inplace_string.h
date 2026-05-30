@@ -1,5 +1,12 @@
 #pragma once
 
+// Force the STL to define its library identification macros
+// #if defined(__has_include) && __has_include(<version>)
+// #include <version>
+// #else
+// #include <ciso646>
+// #endif
+
 #include <algorithm>
 #include <charconv>
 #include <cstdint>
@@ -10,50 +17,55 @@
 #include <type_traits>
 
 #ifdef _LIBCPP_VERSION
-#define QX_STL_LIBCPP // libc++
+#define QX_STL_LIBCPP
 #elif defined(__GLIBCXX__)
-#define QX_STL_LIBSTDCXX // libstdc++
-#include <bits/stl_iterator.h>
+#define QX_STL_LIBSTDCXX
 #elif defined(_MSC_VER)
-#define QX_STL_MSVC // Visual Studio
+#define QX_STL_MSVC
 #endif
 
-#ifdef QX_HAS_BUILTIN
-// Do nothing
-#elif defined(__has_builtin)
+#define QX_STRINGIFY_IMPL(x) #x
+#define QX_STRINGIFY(x) QX_STRINGIFY_IMPL(x)
+
+#ifdef __has_builtin
 #define QX_HAS_BUILTIN(x) __has_builtin(x)
 #else
 #define QX_HAS_BUILTIN(x) 0
 #endif
 
-#ifdef QX_IS_CONSTANT
-// Do nothing
-#elif QX_HAS_BUILTIN(__builtin_constant_p)
+#if QX_HAS_BUILTIN(__builtin_constant_p)
 #define QX_IS_CONSTANT(x) __builtin_constant_p(x)
 #else
 #define QX_IS_CONSTANT(x) false
 #endif
 
-#if QX_HAS_BUILTIN(__builtin_expect)
+#if QX_HAS_BUILTIN(__builtin_expect) || defined(__GNUC__)
 #define QX_LIKELY(x) __builtin_expect(!!(x), 1)
+#define QX_UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
 #define QX_LIKELY(x) (x)
+#define QX_UNLIKELY(x) (x)
 #endif
 
-#if __cplusplus >= 202302L
-#include <utility>
-#define QX_UNREACHABLE() std::unreachable()
-#elif defined(__GNUC__) || QX_HAS_BUILTIN(__builtin_unreachable)
-#define QX_UNREACHABLE() __builtin_unreachable()
-#elif defined(_MSC_VER)
-#define QX_UNREACHABLE() __assume(false)
+#if defined(_MSC_VER)
+#define QX_FORCE_INLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+#define QX_FORCE_INLINE inline __attribute__((always_inline))
 #else
-#define QX_UNREACHABLE()
+#define QX_FORCE_INLINE inline
+#endif
+
+#if QX_HAS_BUILTIN(__builtin_trap) || defined(__GNUC__)
+#define QX_TRAP() __builtin_trap()
+#elif defined(_MSC_VER)
+// On MSVC, __assume(false) tells the optimizer this path never returns
+#define QX_TRAP() (__debugbreak(), __assume(false))
+#else
+#define QX_TRAP() std::abort()
 #endif
 
 namespace qx
 {
-
 namespace intl
 {
 
@@ -64,30 +76,19 @@ constexpr bool is_constant_evaluated() noexcept
 #elif QX_HAS_BUILTIN(__builtin_is_constant_evaluated)
     return __builtin_is_constant_evaluated();
 #else
-    return false;
+    return false; // Fallback
 #endif
 }
 
-[[noreturn]] inline void trap() noexcept
+// NOLINTNEXTLINE(bugprone-exception-escape)
+QX_FORCE_INLINE constexpr void contract_violation(char const* msg) noexcept
 {
-#if QX_HAS_BUILTIN(__builtin_trap)
-    __builtin_trap();
-#elif defined(_MSC_VER)
-    __debugbreak();
-#else
-    // Fallback
-    static_cast<void>(*reinterpret_cast<char volatile*>(0) = 0);
-#endif
-}
-
-[[noreturn]] inline void contract_violation(char const* msg) noexcept
-{
-    if ()
-
-    std::fprintf(stderr, "CONTRACT VIOLATION: %s\n", msg);
+    if (is_constant_evaluated())
+    {
+        throw msg; // NOLINT(hicpp-exception-baseclass, misc-throw-by-value-catch-by-reference)
+    }
+    std::fprintf(stderr, "%s\n", msg); // NOLINT(*-vararg)
     std::fflush(stderr);
-    trap();
-    QX_UNREACHABLE();
 }
 
 #ifndef QX_ASSERT_CONTRACT
@@ -97,7 +98,8 @@ constexpr bool is_constant_evaluated() noexcept
 #define QX_ASSERT_CONTRACT(cond, msg)                                                                                                      \
     (QX_LIKELY(cond)                                                                                                                       \
          ? ((void)0)                                                                                                                       \
-         : ::qx::intl::contract_violation(__FILE__ ":" QX_STRINGIFY(__LINE__) ": QX Hardening assertion '" #cond "' failed: " msg))
+         : (::qx::intl::contract_violation(__FILE__ ":" QX_STRINGIFY(__LINE__) ": Contract violation: '" #cond "' failed: " msg),          \
+            QX_TRAP()))
 #endif
 #endif
 
@@ -105,10 +107,8 @@ constexpr bool is_constant_evaluated() noexcept
 #define QX_ASSERT_THROW(cond, exception_expr)                                                                                              \
     do                                                                                                                                     \
     {                                                                                                                                      \
-        if (QX_UNLIKELY(!(cond)))                                                                                                          \
-        {                                                                                                                                  \
+        if (QX_UNLIKELY(!(cond))) /* NOLINT(readability-simplify-boolean-expr) */                                                          \
             throw(exception_expr);                                                                                                         \
-        }                                                                                                                                  \
     }                                                                                                                                      \
     while (0)
 #endif
@@ -466,7 +466,7 @@ public:
     explicit basic_inplace_string(CharT const* str)
     {
         QX_ASSERT_CONTRACT(str != nullptr, "basic_inplace_string(const CharT*) detected nullptr");
-        init(str, Traits::length(str));
+        init(str, traits_type::length(str));
     }
 
     basic_inplace_string(CharT const* str, size_type n)
@@ -1112,7 +1112,7 @@ public:
         size_type const sz = size();
         QX_ASSERT_THROW(pos <= sz, std::out_of_range{"std::inplace_string"});
         size_type const rlen = std::min(n, sz - pos);
-        Traits::copy(str, data() + pos, rlen);
+        traits_type::copy(str, data() + pos, rlen);
         return rlen;
     }
 
@@ -1166,7 +1166,7 @@ public:
     size_type find(CharT const* str, size_type pos = 0) const noexcept
     {
         QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find(): received nullptr");
-        return find(str, pos, Traits::length(str));
+        return find(str, pos, traits_type::length(str));
     }
 
     size_type find(CharT c, size_type pos = 0) const noexcept
@@ -1176,7 +1176,7 @@ public:
         if (pos > sz)
             return npos;
 
-        CharT const* r = Traits::find(ptr + pos, sz - pos, c);
+        CharT const* r = traits_type::find(ptr + pos, sz - pos, c);
         if (r == nullptr)
             return npos;
 
@@ -1207,14 +1207,14 @@ public:
         else
             pos = sz;
 
-        const_pointer const r = std::find_end(ptr, ptr + pos, str, str + n, Traits::eq);
+        const_pointer const r = std::find_end(ptr, ptr + pos, str, str + n, traits_type::eq);
         if (n > 0 && r == ptr + pos)
             return npos;
 
         return static_cast<size_type>(r - ptr);
     }
 
-    size_type rfind(CharT const* str, size_type pos = npos) const noexcept { return rfind(str, pos, Traits::length(str)); }
+    size_type rfind(CharT const* str, size_type pos = npos) const noexcept { return rfind(str, pos, traits_type::length(str)); }
 
     size_type rfind(CharT c, size_type pos = npos) const noexcept
     {
@@ -1229,7 +1229,7 @@ public:
 
         for (const_pointer ps = ptr + pos; ps != ptr;)
         {
-            if (Traits::eq(*--ps, c))
+            if (traits_type::eq(*--ps, c))
                 return static_cast<size_type>(ps - ptr);
         }
 
@@ -1299,9 +1299,8 @@ public:
 
             for (const_pointer ps = ptr + pos; ps != ptr;)
             {
-                const_pointer r = traits_type::find(str, n, *--ps);
-                if (r)
-                    return static_cast<size_type>(r - ptr);
+                if (traits_type::find(str, n, *(--ps)))
+                    return static_cast<size_type>(ps - ptr);
             }
         }
         return npos;
@@ -1472,7 +1471,7 @@ public:
     int compare(size_type pos1, size_type n1, CharT const* str) const
     {
         QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::compare(): received nullptr");
-        return compare(pos1, n1, str, Traits::length(str));
+        return compare(pos1, n1, str, traits_type::length(str));
     }
 
     int compare(size_type pos1, size_type n1, CharT const* str, size_type n2) const
@@ -1483,7 +1482,7 @@ public:
         QX_ASSERT_THROW(pos1 <= sz && n2 != npos, std::out_of_range{"inplace_string"});
         size_type const rlen = std::min(n1, sz - pos1);
 
-        int r = Traits::compare(data() + pos1, str, std::min(rlen, n2));
+        int r = traits_type::compare(data() + pos1, str, std::min(rlen, n2));
         if (r == 0)
         {
             if (rlen < n2)
@@ -1608,6 +1607,7 @@ private:
     template <class Iterator, class Sentinel>
     void init_with_size(Iterator first, Sentinel last, size_type /*sz*/)
     {
+        // strong exception guarantee: if an exception is thrown during initialization, the string is left in a valid empty state
         try
         {
             pointer const begin = data();
@@ -1702,11 +1702,11 @@ private:
             if (len1 < len2)
                 return last1;
 
-            first1 = Traits::find(first1, len1 - len2 + 1, f2);
+            first1 = traits_type::find(first1, len1 - len2 + 1, f2);
             if (first1 == nullptr)
                 return last1;
 
-            if (Traits::compare(first1, first2, len2) == 0)
+            if (traits_type::compare(first1, first2, len2) == 0)
                 return first1;
 
             ++first1;
@@ -1717,13 +1717,13 @@ private:
     friend class basic_inplace_string;
 
     template <std::size_t M, class T, std::enable_if_t<std::is_arithmetic_v<T>, int>>
-    friend inplace_string<M> to_inplace_string(T val);
+    friend inplace_string<M> to_inplace_string(T);
 
     template <std::size_t M, class T, std::enable_if_t<std::is_arithmetic_v<T>, int>>
-    friend std::optional<inplace_string<M>> try_to_inplace_string(T val) noexcept;
+    friend std::optional<inplace_string<M>> try_to_inplace_string(T) noexcept;
 
     template <std::size_t M, class T, std::enable_if_t<std::is_arithmetic_v<T>, int>>
-    friend inplace_string<M> unchecked_to_inplace_string(T val) noexcept;
+    friend inplace_string<M> unchecked_to_inplace_string(T) noexcept;
 };
 
 template <std::size_t N, class CharT, class Traits, std::size_t M>
@@ -1948,14 +1948,6 @@ inplace_string<N> to_inplace_string(T val)
     QX_ASSERT_THROW(ec == std::errc(), std::length_error{"to_inplace_string: value exceeds buffer capacity"});
     res.set_size_and_null_terminate(end - begin);
     return res;
-}
-
-template <class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-auto to_inplace_string(T val) noexcept
-{
-    static constexpr std::size_t buffer_size =
-        std::is_integral_v<T> ? (std::numeric_limits<T>::digits10 + 1 + std::is_signed_v<T>) : 30 + (static_cast<int>(sizeof(T) > 8) * 32);
-    return unchecked_to_inplace_string<buffer_size>(val);
 }
 
 } // namespace qx

@@ -15,7 +15,7 @@ void test_to_inplace_str(std::initializer_list<std::pair<T, char const*>> pairs)
 {
     for (auto [val, expected] : pairs)
     {
-        auto const str = qx::to_inplace_string(val);
+        auto const str = qx::to_inplace_string<62>(val);
         auto const exp_sv = std::string_view{expected};
         EXPECT_EQ(str, expected);
         // EXPECT_EQ(str, exp_sv);

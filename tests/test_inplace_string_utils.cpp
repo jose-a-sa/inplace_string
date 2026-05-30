@@ -79,3 +79,82 @@ TEST(InplaceStringUtilsTest, Iterators)
     EXPECT_EQ(*s.crbegin(), 'c');
     EXPECT_EQ(*(s.crend() - 1), 'a');
 }
+
+TEST(InplaceStringSubstrTest, SubstrExtraction)
+{
+    qx::inplace_string<12> const s("hello world");
+
+    // Exact bounds slice
+    auto sub1 = s.substr(0, 5);
+    EXPECT_STREQ(sub1.c_str(), "hello");
+
+    // Offset match to end using default count (npos)
+    auto sub2 = s.substr(6);
+    EXPECT_STREQ(sub2.c_str(), "world");
+
+    // Count exceeding remaining size clamped correctly
+    auto sub3 = s.substr(6, 50);
+    EXPECT_STREQ(sub3.c_str(), "world");
+
+    // Out of range offset validation
+    EXPECT_THROW(s.substr(20, 1), std::out_of_range);
+}
+
+TEST(InplaceStringCompareTest, CompareMemberFunctions)
+{
+    qx::inplace_string<10> const s1("abc");
+    qx::inplace_string<10> const s2("def");
+    qx::inplace_string<10> const s3("abc");
+
+    // Direct comparison states
+    EXPECT_LT(s1.compare(s2), 0);
+    EXPECT_GT(s2.compare(s1), 0);
+    EXPECT_EQ(s1.compare(s3), 0);
+
+    // Interaction with string_view/std::string overrides
+    std::string_view sv("abc");
+    EXPECT_EQ(s1.compare(sv), 0);
+
+    // Substring variations (pos, count, target)
+    qx::inplace_string<20> const long_str("prefix_abc_suffix");
+    EXPECT_EQ(long_str.compare(7, 3, "abc"), 0);
+    EXPECT_EQ(long_str.compare(7, 3, s1), 0);
+}
+
+TEST(InplaceStringCopyTest, CopyToRawBuffer)
+{
+    qx::inplace_string<10> const s("abcdef");
+    char buffer[8] = {0};
+
+    // Copy a subset segment cleanly
+    size_t written = s.copy(buffer, 3, 1); // Extract "bcd"
+    EXPECT_EQ(written, 3);
+    EXPECT_EQ(buffer[0], 'b');
+    EXPECT_EQ(buffer[1], 'c');
+    EXPECT_EQ(buffer[2], 'd');
+    EXPECT_EQ(buffer[3], '\0');
+
+    // Clamp behavior when count exceeds length
+    written = s.copy(buffer, 20, 4); // Extract "ef"
+    EXPECT_EQ(written, 2);
+    EXPECT_EQ(buffer[0], 'e');
+    EXPECT_EQ(buffer[1], 'f');
+
+    // Throw checks for out of range offset anchor point
+    EXPECT_THROW(s.copy(buffer, 2, 15), std::out_of_range);
+}
+
+TEST(InplaceStringIteratorTest, MutableIteratorModification)
+{
+    qx::inplace_string<10> s("abc");
+
+    // Modify head through mutable begin()
+    auto it = s.begin();
+    *it = 'x';
+    EXPECT_STREQ(s.c_str(), "xbc");
+
+    // Modify tail through mutable reverse iterator rbegin()
+    auto rit = s.rbegin();
+    *rit = 'z';
+    EXPECT_STREQ(s.c_str(), "xbz");
+}

@@ -12,7 +12,7 @@
 #endif
 
 // ---------------------------------------------------------
-// 1. Construction & Initialization Contracts
+// Construction & Initialization Contracts
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, NullPointerConstructorDeath)
 {
@@ -35,7 +35,7 @@ TEST(InplaceStringContractTest, NullPointerConstructorWithSizeDeath)
 }
 
 // ---------------------------------------------------------
-// 2. Element Access Contracts
+// Element Access Contracts
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, OperatorBracketOutOfBoundsDeath)
 {
@@ -71,7 +71,7 @@ TEST(InplaceStringContractTest, BackOnEmptyDeath)
 }
 
 // ---------------------------------------------------------
-// 3. Modifier Contracts (Append, Assign, Insert, Replace)
+// Modifier Contracts (Append, Assign, Insert, Replace)
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, PopBackEmptyDeath)
 {
@@ -105,15 +105,16 @@ TEST(InplaceStringContractTest, AssignNullPointerDeath)
         "Contract violation");
 }
 
-// TEST(InplaceStringContractTest, InsertNullPointerDeath)
-// {
-//     EXPECT_DEATH_IF_NOT_DEBUG({
-//                                   qx::inplace_string<10> s("ac");
-//                                   char const* null_str = nullptr;
-//                                   s.insert(1, null_str);
-//                               },
-//                               "Contract violation");
-// }
+TEST(InplaceStringContractTest, InsertNullPointerDeath)
+{
+    EXPECT_DEATH_IF_NOT_DEBUG(
+        {
+            qx::inplace_string<10> s("ac");
+            char const* null_str = nullptr;
+            s.insert(1, null_str);
+        },
+        "Contract violation");
+}
 
 TEST(InplaceStringContractTest, ReplaceNullPointerDeath)
 {
@@ -127,7 +128,7 @@ TEST(InplaceStringContractTest, ReplaceNullPointerDeath)
 }
 
 // ---------------------------------------------------------
-// 4. Erase & Iterator Contracts
+// Erase & Iterator Contracts
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, EraseEndIteratorDeath)
 {
@@ -151,45 +152,17 @@ TEST(InplaceStringContractTest, EraseInvalidIteratorRangeDeath)
 }
 
 // ---------------------------------------------------------
-// 5. Cross-Capacity Swapping Contracts
-// ---------------------------------------------------------
-// TEST(InplaceStringContractTest, SwapSourceTooLargeDeath)
-// {
-//     EXPECT_DEATH_IF_NOT_DEBUG({
-//                                   qx::inplace_string<10> large("123456789");
-//                                   qx::inplace_string<5> small;
-//                                   // large.size() (9) > small.capacity() (5)
-//                                   large.swap(small);
-//                               },
-//                               "Contract violation");
-// }
-
-// TEST(InplaceStringContractTest, SwapTargetTooLargeDeath)
-// {
-//     EXPECT_DEATH_IF_NOT_DEBUG({
-//                                   qx::inplace_string<5> small;
-//                                   qx::inplace_string<10> large("123456789");
-//                                   // large.size() (9) > small.capacity() (5)
-//                                   small.swap(large);
-//                               },
-//                               "Contract violation");
-// }
-
-// ---------------------------------------------------------
-// 6. Search & Compare Contracts
+// Search & Compare Contracts
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, FindNullPointerDeath)
 {
-      qx::inplace_string<10> const s("abc");
+    EXPECT_DEATH_IF_NOT_DEBUG(
+        {
+            qx::inplace_string<10> const s("abc");
             char const* null_str = nullptr;
             s.find(null_str);
-    // EXPECT_DEATH_IF_NOT_DEBUG(
-    //     {
-    //         qx::inplace_string<10> const s("abc");
-    //         char const* null_str = nullptr;
-    //         s.find(null_str);
-    //     },
-    //     "Contract violation");
+        },
+        "Contract violation");
 }
 
 TEST(InplaceStringContractTest, CompareNullPointerDeath)
