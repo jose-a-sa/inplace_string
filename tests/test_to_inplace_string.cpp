@@ -28,10 +28,10 @@ void test_to_inplace_str(std::initializer_list<std::pair<T, char const*>> pairs)
 
 TEST(InplaceString, ToInplaceStringSized)
 {
-    EXPECT_THROW(({ (void)qx::to_inplace_string<2, int>(255); }), std::length_error);
-    EXPECT_THROW(({ (void)qx::to_inplace_string<2, uint8_t>(255); }), std::length_error);
-    EXPECT_THROW(({ (void)qx::to_inplace_string<2>(255); }), std::length_error);
-    EXPECT_DEBUG_DEATH(({ (void)qx::unchecked_to_inplace_string<2>(255); }), "");
+    EXPECT_THROW(((void)qx::to_inplace_string<2, int>(255)), std::length_error);
+    EXPECT_THROW(((void)qx::to_inplace_string<2, uint8_t>(255)), std::length_error);
+    EXPECT_THROW(((void)qx::to_inplace_string<2>(255)), std::length_error);
+    EXPECT_DEBUG_DEATH(((void)qx::unchecked_to_inplace_string<2>(255)), "");
 }
 
 TEST(InplaceString, TryToInplaceString)
@@ -89,7 +89,7 @@ TEST(InplaceString, ToInplaceString)
     test_to_inplace_str<float>({{1.23456789555555F, "1.2345679"},
                                 {23.43F, "23.43"},
                                 {1e-9F, "1e-09"},
-                                {1e40F, "inf"},
+                                {std::numeric_limits<float>::infinity(), "inf"},
                                 {1e-40F, "1e-40"},
                                 {123456789.0F, "123456792"}});
 

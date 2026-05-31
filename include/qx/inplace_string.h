@@ -240,11 +240,12 @@ struct is_contiguous_iterator<__gnu_debug::_Safe_iterator<Iter, Seq>, void> : is
 #endif
 
 #elif defined(QX_STL_MSVC) // MSVC STL
+#include <xutility>
 template <class T>
 struct is_contiguous_iterator<T, std::void_t<std::enable_if_t<!std::is_pointer_v<T>>, // Prevents ambiguous match with T* specialization
-                                             decltype(std::_Unwrap_iter(std::declval<T&>()))>>
+                                             decltype(std::_Get_unwrapped(std::declval<T&>()))>>
 {
-    using Unwrapped = decltype(std::_Unwrap_iter(std::declval<T&>()));
+    using Unwrapped = decltype(std::_Get_unwrapped(std::declval<T&>()));
     static constexpr bool value = std::is_pointer_v<Unwrapped>;
 };
 #endif
@@ -292,6 +293,19 @@ struct has_arrow_operator<Ptr, std::void_t<decltype(std::declval<Ptr const&>().o
 {};
 template <class Ptr>
 inline constexpr bool has_arrow_operator_v = has_arrow_operator<Ptr>::value;
+
+// has_msvc_unwrapped (for MSVS STL only)
+
+#ifdef QX_STL_MSVC
+template <typename T, typename = void>
+struct has_msvc_unwrapped : std::false_type
+{};
+template <typename T>
+struct has_msvc_unwrapped<T, std::void_t<decltype(std::declval<T const&>()._Unwrapped())>> : std::true_type
+{};
+template <typename T>
+inline constexpr bool has_msvc_unwrapped_v = has_msvc_unwrapped<T>::value;
+#endif
 
 // is_less_than_comparable
 
@@ -365,6 +379,21 @@ constexpr T* to_address(T* p) noexcept
     static_assert(!std::is_function_v<T>, "T must not be a function type");
     return p;
 }
+
+#ifdef QX_STL_MSVC
+template <class Ptr, std::enable_if_t<std::is_class_v<Ptr> &&
+                                          (has_msvc_unwrapped_v<Ptr> || has_arrow_operator_v<Ptr> || has_pointer_traits_to_address_v<Ptr>),
+                                      int> = 0>
+constexpr auto to_address(Ptr const& p) noexcept -> decltype(auto)
+{
+    if constexpr (has_msvc_unwrapped_v<Ptr>)
+        return to_address(p._Unwrapped());
+    else if constexpr (intl::has_pointer_traits_to_address_v<Ptr>)
+        return std::pointer_traits<Ptr>::to_address(p);
+    else
+        return to_address(p.operator->());
+}
+#else
 template <class Ptr, std::enable_if_t<std::is_class_v<Ptr> && (has_arrow_operator_v<Ptr> || has_pointer_traits_to_address_v<Ptr>), int> = 0>
 constexpr auto to_address(Ptr const& p) noexcept -> decltype(auto)
 {
@@ -373,6 +402,8 @@ constexpr auto to_address(Ptr const& p) noexcept -> decltype(auto)
     else
         return to_address(p.operator->());
 }
+#endif
+
 #endif // __cplusplus >= 202002L
 
 // std::remove_cvref (C++20)
@@ -463,11 +494,12 @@ class basic_inplace_string
     template <class SizeT, class T, std::size_t M>
     struct QX_INPLACE_STRING_ALIGNMENT(SizeT, T) inplace_string_storage
     {
-        SizeT size;
-        std::array<T, M + 1> buffer;
+        SizeT size{};  // NOLINT(*-non-private-member-variables-in-classes)
+        T data[M + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
+        constexpr inplace_string_storage() noexcept { data[0] = T{}; } // NOTE: to avoid full buffer init
     };
 
-    inplace_string_storage<internal_size_type, CharT, N> storage_;
+    inplace_string_storage<internal_size_type, CharT, N> storage_{};
 
 public:
     using traits_type = Traits;
@@ -486,9 +518,7 @@ public:
 
     static constexpr size_type npos = -1;
 
-    constexpr basic_inplace_string() noexcept
-        : storage_{}
-    {}
+    constexpr basic_inplace_string() noexcept = default;
 
     basic_inplace_string(basic_inplace_string const& str, size_type pos)
         : basic_inplace_string(str, pos, npos)
@@ -581,10 +611,10 @@ public:
 
     basic_inplace_string& operator=(std::initializer_list<CharT> il) { return assign(il.begin(), il.size()); }
 
-    constexpr iterator begin() noexcept { return storage_.buffer.begin(); }
-    constexpr const_iterator begin() const noexcept { return storage_.buffer.begin(); }
-    constexpr iterator end() noexcept { return storage_.buffer.begin() + size(); }
-    constexpr const_iterator end() const noexcept { return storage_.buffer.begin() + size(); }
+    constexpr iterator begin() noexcept { return storage_.data; }
+    constexpr const_iterator begin() const noexcept { return storage_.data; }
+    constexpr iterator end() noexcept { return storage_.data + size(); }
+    constexpr const_iterator end() const noexcept { return storage_.data + size(); }
 
     constexpr reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
     constexpr const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(end()); }
@@ -652,27 +682,27 @@ public:
     {
         // TODO(jose): fix messages in the contract checks
         QX_ASSERT_CONTRACT(pos < size(), "basic_inplace_string(const char*, n) detected nullptr");
-        return storage_.buffer[pos];
+        return storage_.data[pos];
     }
 
     reference operator[](size_type pos) noexcept
     {
         QX_ASSERT_CONTRACT(pos < size(), "basic_inplace_string(const char*, n) detected nullptr");
-        return storage_.buffer[pos];
+        return storage_.data[pos];
     }
 
     const_reference at(size_type pos) const
     {
         if (pos >= size())
             intl::throw_out_of_range("basic_inplace_string");
-        return storage_.buffer[pos];
+        return storage_.data[pos];
     }
 
     reference at(size_type pos)
     {
         if (pos >= size())
             intl::throw_out_of_range("basic_inplace_string");
-        return storage_.buffer[pos];
+        return storage_.data[pos];
     }
 
     basic_inplace_string& operator+=(basic_inplace_string const& str) { return append(str); }
@@ -1266,18 +1296,18 @@ public:
     void swap(basic_inplace_string& other) noexcept
     {
         std::size_t const max_s = std::max(size(), other.size());
-        std::swap_ranges(storage_.buffer.data(), storage_.buffer.data() + max_s, other.storage_.buffer.data());
+        std::swap_ranges(storage_.data, storage_.data + max_s, other.storage_.data);
         std::swap(storage_.size, other.storage_.size);
         // Maintain Null Terminators
-        traits_type::assign(storage_.buffer[size()], CharT{});
-        traits_type::assign(other.storage_.buffer[other.size()], CharT{});
+        traits_type::assign(storage_.data[size()], CharT{});
+        traits_type::assign(other.storage_.data[other.size()], CharT{});
     }
 
     // c_str, data
 
     constexpr CharT const* c_str() const noexcept { return data(); }
-    constexpr CharT const* data() const noexcept { return storage_.buffer.data(); }
-    constexpr CharT* data() noexcept { return storage_.buffer.data(); }
+    constexpr CharT const* data() const noexcept { return storage_.data; }
+    constexpr CharT* data() noexcept { return storage_.data; }
 
     // find
 
@@ -1680,14 +1710,14 @@ private:
     {
         QX_ASSERT_CONTRACT(size <= std::numeric_limits<internal_size_type>::max(), "set_size_and_null_terminate size overflow");
         storage_.size = static_cast<internal_size_type>(size);
-        traits_type::assign(storage_.buffer[size], value_type{});
+        traits_type::assign(storage_.data[size], value_type{});
     }
 
     void init(value_type const* str, size_type n)
     {
         if (n > max_size())
             intl::throw_length_error("basic_inplace_string");
-        traits_type::copy(storage_.buffer.data(), str, n);
+        traits_type::copy(data(), str, n);
         set_size_and_null_terminate(n);
     }
 
@@ -1695,7 +1725,7 @@ private:
     {
         if (n > max_size())
             intl::throw_length_error("basic_inplace_string");
-        traits_type::assign(storage_.buffer.data(), n, c);
+        traits_type::assign(data(), n, c);
         set_size_and_null_terminate(n);
     }
 
@@ -1826,9 +1856,11 @@ private:
         if constexpr (intl::is_contiguous_iterator_v<Iterator> && std::is_same_v<value_type, intl::iter_value_t<Iterator>> &&
                       std::is_same_v<Iterator, Sentinel>)
         {
-            QX_ASSERT_CONTRACT(!intl::is_overlapping_range(intl::to_address(first), intl::to_address(last), dest),
+            auto first_unwrap = intl::to_address(first);
+            auto last_unwrap = intl::to_address(last);
+            QX_ASSERT_CONTRACT(!intl::is_overlapping_range(first_unwrap, last_unwrap, dest),
                                "copy_non_overlapping_range called with an overlapping range!");
-            traits_type::copy(dest, intl::to_address(first), last - first);
+            traits_type::copy(dest, first_unwrap, last_unwrap - first_unwrap);
             return dest + (last - first);
         }
 
