@@ -224,11 +224,10 @@ template <class T>
 struct is_contiguous_iterator<T*, void> : std::is_object<T>
 {};
 
-#if defined(QX_STL_LIBCPP) // libc++ (LLVM)
+#if defined(QX_STL_LIBCPP)      // libc++ (LLVM)
 template <class Iter>
 struct is_contiguous_iterator<std::__wrap_iter<Iter>, void> : is_contiguous_iterator<Iter>
 {};
-
 #elif defined(QX_STL_LIBSTDCXX) // libstdc++ (GNU)
 template <class Iter, class Cont>
 struct is_contiguous_iterator<__gnu_cxx::__normal_iterator<Iter, Cont>, void> : is_contiguous_iterator<Iter>
@@ -238,12 +237,10 @@ template <class Iter, class Seq>
 struct is_contiguous_iterator<__gnu_debug::_Safe_iterator<Iter, Seq>, void> : is_contiguous_iterator<Iter>
 {};
 #endif
-
 #elif defined(QX_STL_MSVC) // MSVC STL
 #include <xutility>
 template <class T>
-struct is_contiguous_iterator<T, std::void_t<std::enable_if_t<!std::is_pointer_v<T>>, // Prevents ambiguous match with T* specialization
-                                             decltype(std::_Get_unwrapped(std::declval<T&>()))>>
+struct is_contiguous_iterator<T, std::void_t<std::enable_if_t<!std::is_pointer_v<T>>, decltype(std::_Get_unwrapped(std::declval<T&>()))>>
 {
     using Unwrapped = decltype(std::_Get_unwrapped(std::declval<T&>()));
     static constexpr bool value = std::is_pointer_v<Unwrapped>;
@@ -489,8 +486,9 @@ class basic_inplace_string
     // NOLINTEND(google-runtime-int)
     // clang-format on
 
-    // The actual size type used for storing the size of the string. It is chosen based on the maximum size of the string (N) to save space.
-    // It is guaranteed to be large enough to store any size up to N, and it is an unsigned integer type for simplicity of implementation.
+    // The actual size type used for storing the size of the string. It is chosen based on the maximum size of the
+    // string (N) to save space. It is guaranteed to be large enough to store any size up to N, and it is an unsigned
+    // integer type for simplicity of implementation.
     template <class SizeT, class T, std::size_t M>
     struct QX_INPLACE_STRING_ALIGNMENT(SizeT, T) inplace_string_storage
     {
@@ -1152,8 +1150,7 @@ public:
     {
         size_type const str_sz = str.size();
         if (pos2 > str_sz)
-            intl::throw_out_of_range(
-                "basic_inplace_string::replace(size_type, size_type, basic_inplace_string const&, size_type, size_type)");
+            intl::throw_out_of_range("basic_inplace_string");
         return replace(pos1, n1, str.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
