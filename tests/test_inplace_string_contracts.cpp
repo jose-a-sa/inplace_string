@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <qx/inplace_string.h>
 
 #include <gtest/gtest.h>
@@ -21,7 +22,7 @@ TEST(InplaceStringContractTest, NullPointerConstructorDeath)
             char const* null_str = nullptr;
             qx::inplace_string<10> const s(null_str);
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, NullPointerConstructorWithSizeDeath)
@@ -31,7 +32,7 @@ TEST(InplaceStringContractTest, NullPointerConstructorWithSizeDeath)
             char const* null_str = nullptr;
             qx::inplace_string<10> const s(null_str, 5);
         },
-        "Contract violation");
+        "contract violation");
 }
 
 // ---------------------------------------------------------
@@ -45,7 +46,7 @@ TEST(InplaceStringContractTest, OperatorBracketOutOfBoundsDeath)
             char const volatile c = s[5]; // 5 >= size()
             (void)c;
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, FrontOnEmptyDeath)
@@ -56,7 +57,7 @@ TEST(InplaceStringContractTest, FrontOnEmptyDeath)
             char const volatile c = s.front();
             (void)c;
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, BackOnEmptyDeath)
@@ -67,7 +68,7 @@ TEST(InplaceStringContractTest, BackOnEmptyDeath)
             char const volatile c = s.back();
             (void)c;
         },
-        "Contract violation");
+        "contract violation");
 }
 
 // ---------------------------------------------------------
@@ -80,7 +81,7 @@ TEST(InplaceStringContractTest, PopBackEmptyDeath)
             qx::inplace_string<10> s;
             s.pop_back();
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, AppendNullPointerDeath)
@@ -91,7 +92,7 @@ TEST(InplaceStringContractTest, AppendNullPointerDeath)
             char const* null_str = nullptr;
             s.append(null_str);
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, AssignNullPointerDeath)
@@ -102,7 +103,7 @@ TEST(InplaceStringContractTest, AssignNullPointerDeath)
             char const* null_str = nullptr;
             s.assign(null_str, 5);
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, InsertNullPointerDeath)
@@ -113,7 +114,7 @@ TEST(InplaceStringContractTest, InsertNullPointerDeath)
             char const* null_str = nullptr;
             s.insert(1, null_str);
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, ReplaceNullPointerDeath)
@@ -124,7 +125,7 @@ TEST(InplaceStringContractTest, ReplaceNullPointerDeath)
             char const* null_str = nullptr;
             s.replace(0, 1, null_str);
         },
-        "Contract violation");
+        "contract violation");
 }
 
 // ---------------------------------------------------------
@@ -137,7 +138,7 @@ TEST(InplaceStringContractTest, EraseEndIteratorDeath)
             qx::inplace_string<10> s("abc");
             s.erase(s.end());
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, EraseInvalidIteratorRangeDeath)
@@ -148,7 +149,7 @@ TEST(InplaceStringContractTest, EraseInvalidIteratorRangeDeath)
             // first > last
             s.erase(s.begin() + 2, s.begin() + 1);
         },
-        "Contract violation");
+        "contract violation");
 }
 
 // ---------------------------------------------------------
@@ -162,7 +163,7 @@ TEST(InplaceStringContractTest, FindNullPointerDeath)
             char const* null_str = nullptr;
             s.find(null_str);
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, CompareNullPointerDeath)
@@ -173,7 +174,7 @@ TEST(InplaceStringContractTest, CompareNullPointerDeath)
             char const* null_str = nullptr;
             s.compare(null_str);
         },
-        "Contract violation");
+        "contract violation");
 }
 
 TEST(InplaceStringContractTest, OperatorEqualsNullPointerDeath)
@@ -185,5 +186,5 @@ TEST(InplaceStringContractTest, OperatorEqualsNullPointerDeath)
             bool b = (s == null_str);
             (void)b;
         },
-        "Contract violation");
+        "contract violation");
 }

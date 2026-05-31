@@ -1,7 +1,14 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.23)
 project(QxProject)
 
-set(CMAKE_CXX_STANDARD 17)
+if(CMAKE_CXX_STANDARD)
+  if(CMAKE_CXX_STANDARD LESS 17)
+    message(FATAL_ERROR "Only C++17 and forwards supported")
+  endif()
+else()
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

@@ -14,29 +14,41 @@
 #include <iterator>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 #include <string_view>
 #include <type_traits>
 
-// QX_INPLACE_STR_USE_BAD_ALLOC: controls the exception throw on out-of-capacity
-// QX_INPLACE_STR_BAD_ALLOC
-// QX_INPLACE_STR_NO_EXTENDED_API: allows to control whether try_*/unchecked_* API is added
-// QX_INPLACE_NO_WORD_ALIGNED: allows to control the full basic_inplace_string alignment
-// QX_INPLACE_STR_ALIGNMENT(SizeT, CharT)
-
-#ifdef QX_INPLACE_STR_BAD_ALLOC
-// user defined: do nothing
-#elif defined(QX_INPLACE_STR_USE_BAD_ALLOC)
-#define QX_INPLACE_STR_BAD_ALLOC std::bad_alloc()
+// contract hardening level (currently all/none, default: debug-only)
+#ifndef QX_INPLACE_STRING_HARDENING
+#ifdef NDEBUG
+#define QX_INPLACE_STRING_HARDENING 0
 #else
-#define QX_INPLACE_STR_BAD_ALLOC std::length_error("basic_inplace_string")
+#define QX_INPLACE_STRING_HARDENING 1
+#endif
 #endif
 
-#ifdef QX_INPLACE_STR_ALIGNMENT
-// user defined: do nothing
-#elif defined(QX_INPLACE_NO_WORD_ALIGNED)
-#define QX_INPLACE_STR_ALIGNMENT(SizeT, CharT)
+#define QX_INPLACE_STRING_ASSERT_NONE 0
+#define QX_INPLACE_STRING_ASSERT_TRAP 1
+#define QX_INPLACE_STRING_ASSERT_LOG_TRAP 2
+#define QX_INPLACE_STRING_ASSERT_ABORT 3
+#define QX_INPLACE_STRING_ASSERT_LOG_ABORT 4
+
+#ifndef QX_INPLACE_STRING_ASSERT_MODE
+#define QX_INPLACE_STRING_ASSERT_MODE QX_INPLACE_STRING_ASSERT_LOG_TRAP
+#endif
+
+// inplace_string alignment
+#ifndef QX_INPLACE_STRING_ALIGNMENT
+#ifdef QX_INPLACE_STRING_NO_WORD_ALIGNED
+#define QX_INPLACE_STRING_ALIGNMENT(SizeT, CharT) /* empty */
 #else
-#define QX_INPLACE_STR_ALIGNMENT(SizeT, CharT) alignas(std::max({alignof(std::size_t), alignof(SizeT), alignof(CharT)}))
+#define QX_INPLACE_STRING_ALIGNMENT(SizeT, CharT) alignas(std::max({alignof(SizeT), alignof(CharT), alignof(std::size_t)}))
+#endif
+#endif
+
+// Extended API Toggle
+#ifndef QX_INPLACE_STRING_NO_EXTENDED_API
+#define QX_INPLACE_STRING_NO_EXTENDED_API 0
 #endif
 
 #if defined(_LIBCPP_VERSION)
@@ -78,6 +90,14 @@
 #define QX_FORCE_INLINE inline
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define QX_COLD_NOINLINE __attribute__((cold, noinline))
+#elif defined(_MSC_VER)
+#define QX_COLD_NOINLINE __declspec(noinline) /* MSVC lacks 'cold', but noinline is crucial */
+#else
+#define QX_COLD_NOINLINE
+#endif
+
 #if QX_HAS_BUILTIN(__builtin_trap) || defined(__GNUC__)
 #define QX_TRAP() __builtin_trap()
 #elif defined(_MSC_VER)
@@ -85,6 +105,12 @@
 #define QX_TRAP() (__debugbreak(), __assume(false))
 #else
 #define QX_TRAP() std::abort()
+#endif
+
+#if QX_HAS_BUILTIN(__builtin_verbose_trap)
+#define QX_TRAP_WITH_MSG(tag, msg) __builtin_verbose_trap(tag, msg)
+#else
+#define QX_TRAP_WITH_MSG(tag, msg) QX_TRAP()
 #endif
 
 namespace qx
@@ -103,32 +129,45 @@ constexpr bool is_constant_evaluated() noexcept
 #endif
 }
 
-QX_FORCE_INLINE void v_contract_violation(char const* msg) noexcept
+inline QX_COLD_NOINLINE void v_contract_fail_handler(char const* msg)
 {
-    std::fprintf(stderr, "%s\n", msg); // NOLINT(*-vararg)
+    std::fputs(msg, stderr);
+    std::fputc('\n', stderr);
     std::fflush(stderr);
 }
 
-#ifndef QX_ASSERT_CONTRACT
-#ifdef NDEBUG
-#define QX_ASSERT_CONTRACT(cond, msg) ((void)0)
+[[noreturn]] inline QX_COLD_NOINLINE void throw_out_of_range(char const* msg)
+{
+    throw std::out_of_range{msg};
+}
+
+[[noreturn]] inline QX_COLD_NOINLINE void throw_length_error(char const* msg)
+{
+    throw std::length_error{msg};
+}
+
+#if QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_NONE
+#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) ((void)0)
+#elif QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_TRAP
+#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) (::qx::intl::is_constant_evaluated() ? QX_TRAP() : QX_TRAP_WITH_MSG(tag, msg))
+#elif QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_LOG_TRAP
+#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg)                                                                                            \
+    (::qx::intl::is_constant_evaluated() ? QX_TRAP() : (::qx::intl::v_contract_fail_handler(loc ": " msg), QX_TRAP_WITH_MSG(tag, msg)))
+#elif QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_ABORT
+#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) (::qx::intl::is_constant_evaluated() ? QX_TRAP() : std::abort())
+#elif QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_LOG_ABORT
+#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg)                                                                                            \
+    (::qx::intl::is_constant_evaluated() ? QX_TRAP() : (::qx::intl::v_contract_fail_handler(loc ": " msg), std::abort()))
 #else
-#define QX_ASSERT_CONTRACT(cond, msg)                                                                                                      \
-    (QX_LIKELY(cond)                                                                                                                       \
-         ? ((void)0)                                                                                                                       \
-         : (::qx::intl::v_contract_violation(__FILE__ ":" QX_STRINGIFY(__LINE__) ": Contract violation: '" #cond "' failed: " msg),        \
-            QX_TRAP()))
-#endif
+#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) ((void)0)
 #endif
 
-#ifndef QX_ASSERT_THROW
-#define QX_ASSERT_THROW(cond, exception_expr)                                                                                              \
-    do                                                                                                                                     \
-    {                                                                                                                                      \
-        if (QX_UNLIKELY(!(cond))) /* NOLINT(readability-simplify-boolean-expr) */                                                          \
-            throw(exception_expr);                                                                                                         \
-    }                                                                                                                                      \
-    while (0)
+#if QX_INPLACE_STRING_HARDENING && QX_INPLACE_STRING_ASSERT_MODE
+#define QX_ASSERT_CONTRACT(cond, msg)                                                                                                      \
+    (QX_LIKELY(cond) ? ((void)0)                                                                                                           \
+                     : QX_CONTRACT_FAIL_HANDLER("libqx", __FILE__ ":" QX_STRINGIFY(__LINE__), "contract violation '" #cond "': " msg))
+#else
+#define QX_ASSERT_CONTRACT(cond, msg) ((void)0)
 #endif
 
 // iterator_value
@@ -150,9 +189,10 @@ struct has_iter_category<Iter, Cat, std::void_t<iter_category_t<Iter>>> : std::i
 template <class Iter, class Cat>
 inline constexpr bool has_iter_category_v = has_iter_category<Iter, Cat>::value;
 
+#if __cplusplus >= 202002L
+
 // iterator_concept (C++20)
 
-#if __cplusplus >= 202002L
 template <class Iter>
 using iter_concept_t = typename std::iterator_traits<Iter>::iterator_concept;
 
@@ -164,6 +204,7 @@ struct has_iter_concept<Iter, Concept, std::void_t<iter_concept_t<Iter>>> : std:
 {};
 template <class Iter, class Concept>
 inline constexpr bool has_iter_concept_v = has_iter_concept<Iter, Concept>::value;
+
 #endif
 
 // is_contiguous_iterator
@@ -174,7 +215,7 @@ template <class T>
 struct is_contiguous_iterator : std::bool_constant<std::contiguous_iterator<T>>
 {};
 
-#else // C++17 Implementations
+#else // C++17 implementation
 
 template <class T, class = void>
 struct is_contiguous_iterator : std::false_type
@@ -420,7 +461,7 @@ class basic_inplace_string
     // The actual size type used for storing the size of the string. It is chosen based on the maximum size of the string (N) to save space.
     // It is guaranteed to be large enough to store any size up to N, and it is an unsigned integer type for simplicity of implementation.
     template <class SizeT, class T, std::size_t M>
-    struct QX_INPLACE_STR_ALIGNMENT(SizeT, T) inplace_string_storage
+    struct QX_INPLACE_STRING_ALIGNMENT(SizeT, T) inplace_string_storage
     {
         SizeT size{};
         std::array<T, M + 1> buffer{};
@@ -454,7 +495,8 @@ public:
     basic_inplace_string(basic_inplace_string const& str, size_type pos, size_type n)
     {
         size_type const str_sz = str.size();
-        QX_ASSERT_THROW(pos <= str_sz, std::out_of_range{"basic_inplace_string"});
+        if (pos > str_sz)
+            intl::throw_out_of_range("basic_inplace_string");
         init(str.data() + pos, std::min(n, str_sz - pos));
     }
 
@@ -479,13 +521,13 @@ public:
 
     basic_inplace_string(CharT const* str) // NOLINT(*-explicit-constructor, *-explicit-conversions)
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "basic_inplace_string(const CharT*) detected nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "basic_inplace_string(CharT const*) detected nullptr");
         init(str, traits_type::length(str));
     }
 
     basic_inplace_string(CharT const* str, size_type n)
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "basic_inplace_string(const CharT*, n) detected nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "basic_inplace_string(CharT const*, n) detected nullptr");
         init(str, n);
     }
 
@@ -528,8 +570,8 @@ public:
 
     basic_inplace_string& operator=(CharT c)
     {
-        size_type const cap = capacity();
-        QX_ASSERT_THROW(cap > 0, QX_INPLACE_STR_BAD_ALLOC);
+        if (capacity() == 0)
+            intl::throw_length_error("basic_inplace_string");
         traits_type::assign(*data(), c);
         set_size_and_null_terminate(1);
         return *this;
@@ -559,7 +601,9 @@ public:
 
     void resize(size_type n, CharT c)
     {
-        QX_ASSERT_THROW(n <= max_size(), QX_INPLACE_STR_BAD_ALLOC);
+        if (n > max_size())
+            intl::throw_length_error("basic_inplace_string");
+
         if (n > size())
             append(n - size(), c);
         else
@@ -576,9 +620,9 @@ public:
         {
             if (n > 0)
             {
-                size_type const cap = capacity();
-                QX_ASSERT_THROW(n <= cap - sz, QX_INPLACE_STR_BAD_ALLOC);
-                set_size_and_null_terminate(sz + n);
+                if (n > capacity() - sz) // TODO(jose): confirm
+                    intl::throw_length_error("basic_inplace_string");
+                set_size_and_null_terminate(sz + n); // TODO(jose): confirm
             }
             else
             {
@@ -589,7 +633,11 @@ public:
     };
 
     // ReSharper disable once CppMemberFunctionMayBeConst
-    void reserve(size_type n) { QX_ASSERT_THROW(n <= max_size(), QX_INPLACE_STR_BAD_ALLOC); }
+    void reserve(size_type n)
+    {
+        if (n > max_size())
+            intl::throw_length_error("basic_inplace_string");
+    }
 
     // ReSharper disable once CppMemberFunctionMayBeStatic
     void shrink_to_fit() noexcept { /* nop */ }
@@ -600,6 +648,7 @@ public:
 
     const_reference operator[](size_type pos) const noexcept
     {
+        // TODO(jose): fix messages in the contract checks
         QX_ASSERT_CONTRACT(pos < size(), "basic_inplace_string(const char*, n) detected nullptr");
         return storage_.buffer[pos];
     }
@@ -612,13 +661,15 @@ public:
 
     const_reference at(size_type pos) const
     {
-        QX_ASSERT_THROW(pos < size(), std::out_of_range{"basic_inplace_string"});
+        if (pos >= size())
+            intl::throw_out_of_range("basic_inplace_string");
         return storage_.buffer[pos];
     }
 
     reference at(size_type pos)
     {
-        QX_ASSERT_THROW(pos < size(), std::out_of_range{"basic_inplace_string"});
+        if (pos >= size())
+            intl::throw_out_of_range("basic_inplace_string");
         return storage_.buffer[pos];
     }
 
@@ -652,7 +703,8 @@ public:
     basic_inplace_string& append(basic_inplace_string const& str, size_type pos, size_type n = npos)
     {
         size_type const str_sz = str.size();
-        QX_ASSERT_THROW(pos <= str_sz, std::out_of_range{"basic_inplace_string"});
+        if (pos > str_sz)
+            intl::throw_out_of_range("basic_inplace_string");
         return append(str.data() + pos, std::min(n, str_sz - pos));
     }
 
@@ -661,16 +713,19 @@ public:
     {
         auto const str_view = self_view(str);
         size_type const str_sz = str_view.size();
-        QX_ASSERT_THROW(pos <= str_sz, std::out_of_range{"basic_inplace_string"});
+        if (pos > str_sz)
+            intl::throw_out_of_range("basic_inplace_string");
         return append(str.data() + pos, std::min(n, str_sz - pos));
     }
 
     basic_inplace_string& append(CharT const* str, size_type n)
     {
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::append received nullptr");
-        size_type const cap = capacity();
+
         size_type const sz = size();
-        QX_ASSERT_THROW(n <= cap - sz, QX_INPLACE_STR_BAD_ALLOC);
+        if (n > capacity() - sz)
+            intl::throw_length_error("basic_inplace_string");
+
         if (n > 0)
         {
             pointer end = data() + sz;
@@ -690,9 +745,9 @@ public:
     {
         if (n > 0)
         {
-            size_type const cap = capacity();
             size_type const sz = size();
-            QX_ASSERT_THROW(n <= cap - sz, QX_INPLACE_STR_BAD_ALLOC);
+            if (n > capacity() - sz)
+                intl::throw_length_error("basic_inplace_string");
             pointer end = data() + sz;
             traits_type::assign(end, n, c);
             set_size_and_null_terminate(n + sz);
@@ -706,14 +761,14 @@ public:
         if constexpr (intl::has_iter_category_v<InputIterator, std::forward_iterator_tag>)
         {
             size_type const sz = size();
-            size_type const cap = capacity();
             auto const n = static_cast<size_type>(std::distance(first, last));
             if (n == 0)
                 return *this;
 
             if (intl::is_trivial_contiguous_iterator_v<InputIterator> && !address_in_range(*first))
             {
-                QX_ASSERT_THROW(n <= cap - sz, QX_INPLACE_STR_BAD_ALLOC);
+                if (n > capacity() - sz)
+                    intl::throw_length_error("basic_inplace_string");
                 copy_non_overlapping_range(first, last, data() + sz);
                 set_size_and_null_terminate(sz + n);
                 return *this;
@@ -790,8 +845,8 @@ public:
     {
         pointer const ptr = data();
         size_type const sz = size();
-        size_type const cap = capacity();
-        QX_ASSERT_THROW(sz != cap, QX_INPLACE_STR_BAD_ALLOC);
+        if (sz == capacity())
+            intl::throw_length_error("basic_inplace_string");
         traits_type::assign(ptr[sz], c);
         set_size_and_null_terminate(sz + 1);
     }
@@ -837,7 +892,8 @@ public:
     basic_inplace_string& assign(basic_inplace_string const& str, size_type pos, size_type n = npos)
     {
         size_type const str_size = str.size();
-        QX_ASSERT_THROW(pos <= str_size, std::out_of_range{"basic_inplace_string"});
+        if (pos > str_size)
+            intl::throw_out_of_range("basic_inplace_string");
         return assign(str.data() + pos, std::min(n, str_size - pos));
     }
 
@@ -846,14 +902,16 @@ public:
     {
         auto const str_view = self_view(str);
         size_type const str_size = str_view.size();
-        QX_ASSERT_THROW(pos <= str_size, std::out_of_range{"basic_inplace_string"});
+        if (pos > str_size)
+            intl::throw_out_of_range("basic_inplace_string");
         return assign(str.data() + pos, std::min(n, str_size - pos));
     }
 
     basic_inplace_string& assign(CharT const* str, size_type n)
     {
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "basic_inplace_string::assign received nullptr");
-        QX_ASSERT_THROW(n <= capacity(), QX_INPLACE_STR_BAD_ALLOC);
+        if (n > capacity())
+            intl::throw_length_error("basic_inplace_string");
         traits_type::move(data(), str, n);
         set_size_and_null_terminate(n);
         return *this;
@@ -867,7 +925,8 @@ public:
 
     basic_inplace_string& assign(size_type n, CharT c)
     {
-        QX_ASSERT_THROW(n <= capacity(), QX_INPLACE_STR_BAD_ALLOC);
+        if (n > capacity())
+            intl::throw_length_error("basic_inplace_string");
         traits_type::assign(data(), n, c);
         set_size_and_null_terminate(n);
         return *this;
@@ -879,7 +938,9 @@ public:
         if constexpr (intl::has_iter_category_v<Iterator, std::forward_iterator_tag> && intl::is_trivial_contiguous_iterator_v<Iterator>)
         {
             auto const n = static_cast<size_type>(std::distance(first, last));
+            // TODO(jose): Missing capacity check ?
             assign_trivial(first, last, n);
+            // TODO(jose): Missing return ?
         }
 
         assign_with_sentinel(first, last);
@@ -903,7 +964,8 @@ public:
     basic_inplace_string& insert(size_type pos1, basic_inplace_string const& str, size_type pos2, size_type n2 = npos)
     {
         size_type const str_sz = str.size();
-        QX_ASSERT_THROW(pos2 <= str_sz, std::out_of_range{"basic_inplace_string"});
+        if (pos2 > str_sz)
+            intl::throw_out_of_range("basic_inplace_string");
         return insert(pos1, str.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
@@ -912,7 +974,8 @@ public:
     {
         auto const str_view = self_view(str);
         size_type const str_sz = str_view.size();
-        QX_ASSERT_THROW(pos2 <= str_sz, std::out_of_range{"basic_inplace_string"});
+        if (pos2 > str_sz)
+            intl::throw_out_of_range("basic_inplace_string");
         return insert(pos1, str_view.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
@@ -920,9 +983,11 @@ public:
     {
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::insert received nullptr");
         size_type sz = size();
-        QX_ASSERT_THROW(pos <= sz, std::out_of_range{"basic_inplace_string"});
-        size_type cap = capacity();
-        QX_ASSERT_THROW(n <= cap - sz, QX_INPLACE_STR_BAD_ALLOC);
+
+        if (pos > sz)
+            intl::throw_out_of_range("basic_inplace_string");
+        if (n > capacity() - sz)
+            intl::throw_length_error("basic_inplace_string");
 
         if (n == 0)
             return *this;
@@ -951,12 +1016,13 @@ public:
     basic_inplace_string& insert(size_type pos, size_type n, CharT c) // constexpr since C++20
     {
         size_type sz = size();
-        QX_ASSERT_THROW(pos <= sz, std::out_of_range{"basic_inplace_string"});
+        if (pos > sz)
+            intl::throw_out_of_range("basic_inplace_string");
         if (n == 0)
             return *this;
 
-        size_type cap = capacity();
-        QX_ASSERT_THROW(n <= cap - sz, QX_INPLACE_STR_BAD_ALLOC);
+        if (n > capacity() - sz)
+            intl::throw_length_error("basic_inplace_string");
 
         pointer p = data();
         size_type n_move = sz - pos;
@@ -998,7 +1064,8 @@ public:
 
     basic_inplace_string& erase(size_type pos = 0, size_type n = npos)
     {
-        QX_ASSERT_THROW(pos <= size(), std::length_error{"inplace_basic_string"});
+        if (pos > size())
+            intl::throw_length_error("basic_inplace_string");
 
         if (n == npos)
         {
@@ -1052,7 +1119,9 @@ public:
     basic_inplace_string& replace(size_type pos1, size_type n1, basic_inplace_string const& str, size_type pos2, size_type n2 = npos)
     {
         size_type const str_sz = str.size();
-        QX_ASSERT_THROW(pos2 <= str_sz, std::out_of_range{"basic_inplace_string"});
+        if (pos2 > str_sz)
+            intl::throw_out_of_range(
+                "basic_inplace_string::replace(size_type, size_type, basic_inplace_string const&, size_type, size_type)");
         return replace(pos1, n1, str.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
@@ -1061,7 +1130,8 @@ public:
     {
         auto const str_view = self_view(str);
         size_type const str_sz = str_view.size();
-        QX_ASSERT_THROW(pos2 <= str_sz, std::out_of_range{"basic_inplace_string"});
+        if (pos2 > str_sz)
+            intl::throw_out_of_range("basic_inplace_string");
         return replace(pos1, n1, str_view.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
@@ -1070,11 +1140,13 @@ public:
         QX_ASSERT_CONTRACT(n2 == 0 || str != nullptr, "basic_inplace_string::replace received nullptr");
 
         size_type const sz = size();
-        QX_ASSERT_THROW(pos <= sz, std::out_of_range{"basic_inplace_string"});
+        if (pos > sz)
+            intl::throw_out_of_range("basic_inplace_string");
 
         n1 = std::min(n1, sz - pos);
         size_type const new_size = sz - n1 + n2;
-        QX_ASSERT_THROW(new_size <= capacity(), QX_INPLACE_STR_BAD_ALLOC);
+        if (new_size > capacity())
+            intl::throw_length_error("basic_inplace_string");
 
         pointer const ptr = data();
         pointer const dst = ptr + pos;
@@ -1114,12 +1186,13 @@ public:
     basic_inplace_string& replace(size_type pos, size_type n1, size_type n2, CharT c)
     {
         size_type const sz = size();
-        QX_ASSERT_THROW(pos <= sz, std::out_of_range{"basic_inplace_string"});
+        if (pos > sz)
+            intl::throw_out_of_range("basic_inplace_string");
 
         n1 = std::min(n1, sz - pos);
-        size_type const cap = capacity();
         size_type const new_size = sz - n1 + n2;
-        QX_ASSERT_THROW(new_size <= cap, QX_INPLACE_STR_BAD_ALLOC);
+        if (new_size > capacity())
+            intl::throw_length_error("basic_inplace_string");
 
         pointer ptr = data();
         if (n1 != n2)
@@ -1179,7 +1252,8 @@ public:
     size_type copy(CharT* str, size_type n, size_type pos = 0) const
     {
         size_type const sz = size();
-        QX_ASSERT_THROW(pos <= sz, std::out_of_range{"std::inplace_string"});
+        if (pos > sz)
+            intl::throw_out_of_range("basic_inplace_string");
         size_type const rlen = std::min(n, sz - pos);
         traits_type::copy(str, data() + pos, rlen);
         return rlen;
@@ -1548,7 +1622,9 @@ public:
         QX_ASSERT_CONTRACT(n2 == 0 || str != nullptr, "inplace_string::compare(): received nullptr");
         size_type const sz = size();
 
-        QX_ASSERT_THROW(pos1 <= sz && n2 != npos, std::out_of_range{"basic_inplace_string"});
+        if (pos1 > sz || n2 == npos)
+            intl::throw_out_of_range("basic_inplace_string");
+
         size_type const rlen = std::min(n1, sz - pos1);
 
         int r = traits_type::compare(data() + pos1, str, std::min(rlen, n2));
@@ -1607,14 +1683,16 @@ private:
 
     void init(value_type const* str, size_type n)
     {
-        QX_ASSERT_THROW(n <= max_size(), QX_INPLACE_STR_BAD_ALLOC);
+        if (n > max_size())
+            intl::throw_length_error("basic_inplace_string");
         traits_type::copy(storage_.buffer.data(), str, n);
         set_size_and_null_terminate(n);
     }
 
     void init(size_type n, value_type c)
     {
-        QX_ASSERT_THROW(n <= max_size(), QX_INPLACE_STR_BAD_ALLOC);
+        if (n > max_size())
+            intl::throw_length_error("basic_inplace_string");
         traits_type::assign(storage_.buffer.data(), n, c);
         set_size_and_null_terminate(n);
     }
@@ -1625,6 +1703,7 @@ private:
         if constexpr (intl::has_iter_category_v<InputIterator, std::forward_iterator_tag>)
         {
             auto const sz = static_cast<size_type>(std::distance(first, last));
+            // TODO(jose): missing capacity check ?
             init_with_size(std::move(first), std::move(last), sz);
         }
         else
@@ -1712,7 +1791,8 @@ private:
     {
         size_type sz = size();
         size_type const cap = capacity();
-        QX_ASSERT_THROW(cap - sz >= n, QX_INPLACE_STR_BAD_ALLOC);
+        if (n > capacity() - sz)
+            intl::throw_length_error("basic_inplace_string");
         pointer ptr = data();
 
         size_type n_move = sz - ip;
@@ -2014,7 +2094,8 @@ inplace_string<N> to_inplace_string(T val)
     inplace_string<N> res;
     auto const begin = res.data();
     auto [end, ec] = std::to_chars(begin, begin + N, val);
-    QX_ASSERT_THROW(ec == std::errc(), std::length_error{"to_inplace_string: value exceeds buffer capacity"});
+    if (ec != std::errc())
+        intl::throw_length_error("to_inplace_string");
     res.set_size_and_null_terminate(end - begin);
     return res;
 }
