@@ -2,9 +2,10 @@
 
 #include <gtest/gtest.h>
 
-#include <vector>
+#include <array>
 #include <deque>
 #include <list>
+#include <vector>
 
 static_assert(qx::intl::is_trivial_contiguous_iterator<std::vector<char>::iterator>::value);
 static_assert(!qx::intl::is_trivial_contiguous_iterator<std::deque<char>::iterator>::value);
@@ -145,7 +146,7 @@ TEST(InplaceStringInitTest, CStringAssignmentBounds)
     qx::inplace_string<5> s;
     s.assign("abcd");
     EXPECT_STREQ(s.c_str(), "abcd");
-    
+
     // Assigning string longer than capacity should throw
     EXPECT_THROW(s.assign("abcdef"), std::length_error);
 }
