@@ -329,7 +329,7 @@ constexpr bool is_pointer_in_range(T const* begin, T const* end, U const* ptr)
         return false;
     }
 
-    if constexpr (is_less_than_comparable<T const*, U const*>::value)
+    if constexpr (is_less_than_comparable_v<T const*, U const*>)
     {
         return !std::less<>{}(ptr, begin) && std::less<>{}(ptr, end);
     }
@@ -368,7 +368,7 @@ constexpr T* to_address(T* p) noexcept
 template <class Ptr, std::enable_if_t<std::is_class_v<Ptr> && (has_arrow_operator_v<Ptr> || has_pointer_traits_to_address_v<Ptr>), int> = 0>
 constexpr auto to_address(Ptr const& p) noexcept -> decltype(auto)
 {
-    if constexpr (intl::has_pointer_traits_to_address<Ptr>::value)
+    if constexpr (intl::has_pointer_traits_to_address_v<Ptr>)
         return std::pointer_traits<Ptr>::to_address(p);
     else
         return to_address(p.operator->());
@@ -441,11 +441,11 @@ class basic_inplace_string
     // clang-format off
     template <class U>
     using enable_if_string_like_t =
-        std::enable_if_t<intl::convertible_to_string_view<CharT, Traits, U>::value, int>;
+        std::enable_if_t<intl::convertible_to_string_view_v<CharT, Traits, U>, int>;
         
     template <class U>
     using enable_if_unsame_string_like_t =
-        std::enable_if_t<intl::convertible_to_string_view<CharT, Traits, U>::value && 
+        std::enable_if_t<intl::convertible_to_string_view_v<CharT, Traits, U> && 
                         !std::is_same_v<intl::remove_cvref_t<U>, basic_inplace_string>, int>;
 
     // NOLINTBEGIN(google-runtime-int)
@@ -463,11 +463,11 @@ class basic_inplace_string
     template <class SizeT, class T, std::size_t M>
     struct QX_INPLACE_STRING_ALIGNMENT(SizeT, T) inplace_string_storage
     {
-        SizeT size{};
-        std::array<T, M + 1> buffer{};
+        SizeT size;
+        std::array<T, M + 1> buffer;
     };
 
-    inplace_string_storage<internal_size_type, CharT, N> storage_{};
+    inplace_string_storage<internal_size_type, CharT, N> storage_;
 
 public:
     using traits_type = Traits;
@@ -486,7 +486,9 @@ public:
 
     static constexpr size_type npos = -1;
 
-    constexpr basic_inplace_string() noexcept = default;
+    constexpr basic_inplace_string() noexcept
+        : storage_{}
+    {}
 
     basic_inplace_string(basic_inplace_string const& str, size_type pos)
         : basic_inplace_string(str, pos, npos)
@@ -1821,7 +1823,7 @@ private:
     template <class Iterator, class Sentinel>
     static value_type* copy_non_overlapping_range(Iterator first, Sentinel last, value_type* dest)
     {
-        if constexpr (intl::is_contiguous_iterator<Iterator>::value && std::is_same_v<value_type, intl::iter_value_t<Iterator>> &&
+        if constexpr (intl::is_contiguous_iterator_v<Iterator> && std::is_same_v<value_type, intl::iter_value_t<Iterator>> &&
                       std::is_same_v<Iterator, Sentinel>)
         {
             QX_ASSERT_CONTRACT(!intl::is_overlapping_range(intl::to_address(first), intl::to_address(last), dest),
