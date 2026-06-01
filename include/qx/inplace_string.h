@@ -18,7 +18,7 @@
 #include <string_view>
 #include <type_traits>
 
-// contract hardening level (currently all/none, default: debug-only)
+// contract hardening level (0: none, 1: all, default: debug-only)
 #ifndef QX_INPLACE_STRING_HARDENING
 #ifdef NDEBUG
 #define QX_INPLACE_STRING_HARDENING 0
@@ -27,6 +27,7 @@
 #endif
 #endif
 
+// contract assert behaviour (default: IO-logging and trap)
 #define QX_INPLACE_STRING_ASSERT_NONE 0
 #define QX_INPLACE_STRING_ASSERT_TRAP 1
 #define QX_INPLACE_STRING_ASSERT_LOG_TRAP 2
@@ -35,6 +36,11 @@
 
 #ifndef QX_INPLACE_STRING_ASSERT_MODE
 #define QX_INPLACE_STRING_ASSERT_MODE QX_INPLACE_STRING_ASSERT_LOG_TRAP
+#else
+#if (QX_INPLACE_STRING_ASSERT_MODE > QX_INPLACE_STRING_ASSERT_LOG_ABORT)
+#undef QX_INPLACE_STRING_ASSERT_MODE
+#define QX_INPLACE_STRING_ASSERT_MODE QX_INPLACE_STRING_ASSERT_NONE
+#endif
 #endif
 
 // inplace_string alignment
@@ -242,8 +248,8 @@ struct is_contiguous_iterator<__gnu_debug::_Safe_iterator<Iter, Seq>, void> : is
 template <class T>
 struct is_contiguous_iterator<T, std::void_t<std::enable_if_t<!std::is_pointer_v<T>>, decltype(std::_Get_unwrapped(std::declval<T&>()))>>
 {
-    using Unwrapped = decltype(std::_Get_unwrapped(std::declval<T&>()));
-    static constexpr bool value = std::is_pointer_v<Unwrapped>;
+    using unwrapped_type = decltype(std::_Get_unwrapped(std::declval<T&>()));
+    static constexpr bool value = std::is_pointer_v<unwrapped_type>;
 };
 #endif
 #endif // __cplusplus >= 202002L
@@ -291,7 +297,7 @@ struct has_arrow_operator<Ptr, std::void_t<decltype(std::declval<Ptr const&>().o
 template <class Ptr>
 inline constexpr bool has_arrow_operator_v = has_arrow_operator<Ptr>::value;
 
-// has_msvc_unwrapped (for MSVS STL only)
+// has_msvc_unwrapped (for MSVC STL only)
 
 #ifdef QX_STL_MSVC
 template <typename T, typename = void>
@@ -388,7 +394,7 @@ constexpr auto to_address(Ptr const& p) noexcept -> decltype(auto)
     else if constexpr (intl::has_pointer_traits_to_address_v<Ptr>)
         return std::pointer_traits<Ptr>::to_address(p);
     else
-        return to_address(p.operator->());
+        return to_address(p.operator->()); // NOTE: can trigger MSVC harding on end() iterators
 }
 #else
 template <class Ptr, std::enable_if_t<std::is_class_v<Ptr> && (has_arrow_operator_v<Ptr> || has_pointer_traits_to_address_v<Ptr>), int> = 0>
@@ -2111,12 +2117,10 @@ std::optional<inplace_string<N>> try_to_inplace_string(T val) noexcept
     inplace_string<N> res;
     auto const begin = res.data();
     auto const [end, ec] = std::to_chars(begin, begin + N, val);
-    if (ec == std::errc())
-    {
-        res.set_size_and_null_terminate(end - begin);
-        return res;
-    }
-    return std::nullopt;
+    if (ec != std::errc())
+        return std::nullopt;
+    res.set_size_and_null_terminate(end - begin);
+    return res;
 }
 
 template <std::size_t N, class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
