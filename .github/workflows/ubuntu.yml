@@ -1,0 +1,83 @@
+name: Ubuntu Build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  linux:
+    runs-on: ${{ matrix.cfg.os }}
+    name: ${{ matrix.cfg.cc }} | ${{ matrix.cfg.stdlib }} | C++${{ matrix.cpp_std }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cfg:
+          - {os: ubuntu-22.04, cc: gcc-11,     cxx: g++-11,       stdlib: libstdc++}
+          - {os: ubuntu-24.04, cc: gcc-14,     cxx: g++-14,       stdlib: libstdc++}
+          - {os: ubuntu-22.04, cc: clang-14,   cxx: clang++-14,   stdlib: libstdc++}
+          - {os: ubuntu-24.04, cc: clang-18,   cxx: clang++-18,   stdlib: libstdc++}
+          - {os: ubuntu-24.04, cc: clang-20,   cxx: clang++-20,   stdlib: libstdc++}
+          - {os: ubuntu-22.04, cc: clang-14,   cxx: clang++-14,   stdlib: libc++, stdlib_version: "14"}
+          - {os: ubuntu-24.04, cc: clang-18,   cxx: clang++-18,   stdlib: libc++, stdlib_version: "18"}
+          - {os: ubuntu-24.04, cc: clang-20,   cxx: clang++-20,   stdlib: libc++, stdlib_version: "20"}
+        cpp_std: [17, 20]
+        exclude:
+          - {cfg: {os: ubuntu-22.04, cc: clang-14, cxx: clang++-14, stdlib: libc++, stdlib_version: "14"}, cpp_std: 20}
+        include:
+          - {cfg: {os: ubuntu-22.04, cc: clang-14, cxx: clang++-14, stdlib: libc++, stdlib_version: "14"}, cpp_std: 17}
+
+    env:
+      CC: ${{ matrix.cfg.cc }}
+      CXX: ${{ matrix.cfg.cxx }}
+      CXXFLAGS: ${{ matrix.cfg.stdlib == 'libc++' && '-stdlib=libc++' || '' }}
+      LDFLAGS: ${{ matrix.cfg.stdlib == 'libc++' && '-lc++ -lc++abi' || '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake ${{ matrix.cfg.cc }} ${{ matrix.cfg.cxx }}
+          if [ "${{ matrix.cfg.stdlib }}" = "libc++" ]; then
+            sudo apt-get install -y \
+              libc++-${{ matrix.cfg.stdlib_version }}-dev \
+              libc++abi-${{ matrix.cfg.stdlib_version }}-dev
+          fi
+
+      - name: Configure CMake (Debug)
+        run: |
+          cmake -S . -B build-Debug \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+            -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+            -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
+            -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS"
+
+      - name: Build Project (Debug)
+        run: cmake --build build-Debug --parallel
+
+      - name: Run Tests (Debug)
+        run: ctest --test-dir build-Debug --output-on-failure
+
+      - name: Configure CMake (Release)
+        run: |
+          cmake -S . -B build-Release \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+            -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+            -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
+            -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS"
+
+      - name: Build Project (Release)
+        run: cmake --build build-Release --parallel
+
+      - name: Run Tests (Release)
+        run: ctest --test-dir build-Release --output-on-failure

@@ -239,8 +239,8 @@ template <class Iter, class Cont>
 struct is_contiguous_iterator<__gnu_cxx::__normal_iterator<Iter, Cont>, void> : is_contiguous_iterator<Iter>
 {};
 #ifdef _GLIBCXX_DEBUG
-template <class Iter, class Seq>
-struct is_contiguous_iterator<__gnu_debug::_Safe_iterator<Iter, Seq>, void> : is_contiguous_iterator<Iter>
+template <class Iter, class Cont>
+struct is_contiguous_iterator<__gnu_debug::_Safe_iterator<Iter, Cont>, void> : is_contiguous_iterator<Iter>
 {};
 #endif
 #elif defined(QX_STL_MSVC) // MSVC STL
