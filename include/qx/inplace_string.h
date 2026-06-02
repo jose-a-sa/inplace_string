@@ -407,6 +407,7 @@ constexpr auto to_address(Ptr const& p) noexcept -> decltype(auto)
         return to_address(p.operator->());
 #else
         return p._M_current; // NOTE: to avoid hardening on end() iterators in libstdc++ debug mode
+#endif
 }
 #endif
 
