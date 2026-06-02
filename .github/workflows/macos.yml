@@ -9,7 +9,7 @@ on:
 jobs:
   macos:
     runs-on: ${{ matrix.cfg.os }}
-    name: ${{ matrix.cfg.cc }} | ${{ matrix.cfg.stdlib }} | C++${{ matrix.cpp_std }}
+    name: ${{ matrix.cfg.os }} | ${{ matrix.cfg.cc }} | ${{ matrix.cfg.stdlib }} | C++${{ matrix.cpp_std }}
 
     strategy:
       fail-fast: false
