@@ -403,7 +403,10 @@ constexpr auto to_address(Ptr const& p) noexcept -> decltype(auto)
     if constexpr (intl::has_pointer_traits_to_address_v<Ptr>)
         return std::pointer_traits<Ptr>::to_address(p);
     else
+#ifndef _GLIBCXX_DEBUG
         return to_address(p.operator->());
+#else
+        return p._M_current; // NOTE: to avoid hardening on end() iterators in libstdc++ debug mode
 }
 #endif
 
