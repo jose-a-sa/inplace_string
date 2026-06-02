@@ -27,9 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build tools
-        run: brew install ninja cmake
-
       - name: Configure CMake (Debug)
         run: |
           cmake -S . -B build-Debug \
