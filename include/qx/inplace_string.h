@@ -46,9 +46,9 @@
 // inplace_string alignment
 #ifndef QX_INPLACE_STRING_ALIGNMENT
 #ifdef QX_INPLACE_STRING_NO_WORD_ALIGNED
-#define QX_INPLACE_STRING_ALIGNMENT(SizeT, CharT) /* empty */
+#define QX_INPLACE_STRING_ALIGNMENT 1
 #else
-#define QX_INPLACE_STRING_ALIGNMENT(SizeT, CharT) alignas(std::max({alignof(SizeT), alignof(CharT), alignof(std::size_t)}))
+#define QX_INPLACE_STRING_ALIGNMENT alignof(std::size_t)
 #endif
 #endif
 
@@ -422,6 +422,17 @@ template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 #endif // __cplusplus >= 202002L
 
+template <std::size_t...>
+struct const_max;
+template <std::size_t A>
+struct const_max<A> : std::integral_constant<std::size_t, A>
+{};
+template <std::size_t A, std::size_t B, std::size_t... Rest>
+struct const_max<A, B, Rest...> : std::integral_constant<std::size_t, const_max<(A > B ? A : B), Rest...>::value>
+{};
+template <std::size_t... As>
+inline constexpr std::size_t const_max_v = const_max<As...>::value;
+
 } // namespace intl
 
 /**
@@ -496,7 +507,7 @@ class basic_inplace_string
     // string (N) to save space. It is guaranteed to be large enough to store any size up to N, and it is an unsigned
     // integer type for simplicity of implementation.
     template <class SizeT, class T, std::size_t M>
-    struct QX_INPLACE_STRING_ALIGNMENT(SizeT, T) inplace_string_storage
+    struct alignas(intl::const_max_v<alignof(SizeT), alignof(T), QX_INPLACE_STRING_ALIGNMENT>) inplace_string_storage
     {
         SizeT size{};  // NOLINT(*-non-private-member-variables-in-classes)
         T data[M + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
