@@ -238,11 +238,18 @@ struct is_contiguous_iterator<std::__wrap_iter<Iter>, void> : is_contiguous_iter
 template <class Iter, class Cont>
 struct is_contiguous_iterator<__gnu_cxx::__normal_iterator<Iter, Cont>, void> : is_contiguous_iterator<Iter>
 {};
-#ifdef _GLIBCXX_DEBUG
 template <class Iter, class Cont, class Tag>
 struct is_contiguous_iterator<__gnu_debug::_Safe_iterator<Iter, Cont, Tag>, void> : is_contiguous_iterator<Iter>
 {};
-#endif
+template <class T>
+struct is_gnu_safe_iterator : std::false_type
+{};
+template <class Iter, class Cont, class Tag>
+struct is_gnu_safe_iterator<__gnu_debug::_Safe_iterator<Iter, Cont, Tag>> : std::true_type
+{};
+template <class T>
+inline constexpr bool is_gnu_debug_safe_iterator_v = is_gnu_safe_iterator<T>::value;
+
 #elif defined(QX_STL_MSVC) // MSVC STL
 #include <xutility>
 template <class T>
@@ -383,33 +390,31 @@ constexpr T* to_address(T* p) noexcept
     return p;
 }
 
-#ifdef QX_STL_MSVC
-template <class Ptr, std::enable_if_t<std::is_class_v<Ptr> &&
-                                          (has_msvc_unwrapped_v<Ptr> || has_arrow_operator_v<Ptr> || has_pointer_traits_to_address_v<Ptr>),
-                                      int> = 0>
-constexpr auto to_address(Ptr const& p) noexcept -> decltype(auto)
-{
-    if constexpr (has_msvc_unwrapped_v<Ptr>)
-        return to_address(p._Unwrapped());
-    else if constexpr (intl::has_pointer_traits_to_address_v<Ptr>)
-        return std::pointer_traits<Ptr>::to_address(p);
-    else
-        return to_address(p.operator->()); // NOTE: can trigger MSVC harding on end() iterators
-}
+#if defined(QX_STL_LIBSTDCXX)
+template <class T>
+inline constexpr auto is_fancy_pointer_v = is_gnu_debug_safe_iterator_v<T> || has_pointer_traits_to_address_v<T> || has_arrow_operator_v<T>;
+#elif defined(QX_STL_MSVC)
+template <class T>
+inline constexpr auto is_fancy_pointer_v = has_msvc_unwrapped_v<T> || has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>;
 #else
-template <class Ptr, std::enable_if_t<std::is_class_v<Ptr> && (has_arrow_operator_v<Ptr> || has_pointer_traits_to_address_v<Ptr>), int> = 0>
+template <class T>
+inline constexpr auto is_fancy_pointer_v = has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>;
+#endif
+
+template <class Ptr, std::enable_if_t<std::is_class_v<Ptr> && is_fancy_pointer_v<Ptr>, int> = 0>
 constexpr auto to_address(Ptr const& p) noexcept -> decltype(auto)
 {
     if constexpr (intl::has_pointer_traits_to_address_v<Ptr>)
         return std::pointer_traits<Ptr>::to_address(p);
-    else
-#ifndef _GLIBCXX_DEBUG
-        return to_address(p.operator->());
-#else
-        return p._M_current; // NOTE: to avoid hardening on end() iterators in libstdc++ debug mode
+#if defined(QX_STL_LIBSTDCXX)
+    if constexpr (is_gnu_debug_safe_iterator_v<Ptr>)
+        return to_address(p.base().operator->());
+#elif defined(QX_STL_MSVC)
+    if constexpr (has_msvc_unwrapped_v<Ptr>)
+        return to_address(p._Unwrapped());
 #endif
+    return to_address(p.operator->());
 }
-#endif
 
 #endif // __cplusplus >= 202002L
 
