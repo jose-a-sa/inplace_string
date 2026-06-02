@@ -1,0 +1,59 @@
+name: macOS Build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  macos:
+    runs-on: ${{ matrix.cfg.os }}
+    name: ${{ matrix.cfg.cc }} | ${{ matrix.cfg.stdlib }} | C++${{ matrix.cpp_std }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cfg:
+          - {os: macos-14, cc: clang, cxx: clang++, stdlib: libc++}
+          - {os: macos-15, cc: clang, cxx: clang++, stdlib: libc++}
+          - {os: macos-26, cc: clang, cxx: clang++, stdlib: libc++}
+        cpp_std: [17, 20]
+
+    env:
+      CC: ${{ matrix.cfg.cc }}
+      CXX: ${{ matrix.cfg.cxx }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install ninja cmake
+
+      - name: Configure CMake (Debug)
+        run: |
+          cmake -S . -B build-Debug \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON 
+
+      - name: Build Project (Debug)
+        run: cmake --build build-Debug --parallel
+
+      - name: Run Tests (Debug)
+        run: ctest --test-dir build-Debug --output-on-failure
+
+      - name: Configure CMake (Release)
+        run: |
+          cmake -S . -B build-Release \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON 
+
+      - name: Build Project (Release)
+        run: cmake --build build-Release --parallel
+
+      - name: Run Tests (Release)
+        run: ctest --test-dir build-Release --output-on-failure

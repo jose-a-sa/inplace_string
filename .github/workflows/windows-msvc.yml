@@ -1,0 +1,58 @@
+name: Windows MSVC Build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.cfg.os }}
+    name: MSVC-${{ matrix.cfg.toolset }} | C++${{ matrix.cpp_std }}
+    
+    strategy:
+      fail-fast: false 
+      matrix:
+        cfg:
+          - { os: windows-2022, toolset: 14.2 }
+          - { os: windows-2022, toolset: 14.4 }
+          - { os: windows-2025-vs2026, toolset: 14.5 }
+        cpp_std: [17, 20]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC Environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          toolset: ${{ matrix.cfg.toolset }}
+          arch: x64
+
+      - name: Configure CMake (Debug)
+        run: >
+          cmake -B build-Debug -G Ninja 
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }}
+          -DCMAKE_CXX_STANDARD_REQUIRED=ON
+
+      - name: Build Project (Debug)
+        run: cmake --build build-Debug --parallel
+
+      - name: Run Tests (Debug)
+        run: ctest --test-dir build-Debug --output-on-failure --parallel
+
+      - name: Configure CMake (Release)
+        run: >
+          cmake -B build-Release -G Ninja 
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }}
+          -DCMAKE_CXX_STANDARD_REQUIRED=ON
+
+      - name: Build Project (Release)
+        run: cmake --build build-Release --parallel
+
+      - name: Run Tests (Release)
+        run: ctest --test-dir build-Release --output-on-failure --parallel
+
