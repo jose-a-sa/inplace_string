@@ -15,14 +15,14 @@ jobs:
       fail-fast: false
       matrix:
         cfg:
-          - {os: ubuntu-22.04, cc: gcc-11,     cxx: g++-11,       stdlib: libstdc++}
-          - {os: ubuntu-24.04, cc: gcc-14,     cxx: g++-14,       stdlib: libstdc++}
-          - {os: ubuntu-22.04, cc: clang-14,   cxx: clang++-14,   stdlib: libstdc++}
-          - {os: ubuntu-24.04, cc: clang-18,   cxx: clang++-18,   stdlib: libstdc++}
-          - {os: ubuntu-24.04, cc: clang-20,   cxx: clang++-20,   stdlib: libstdc++}
-          - {os: ubuntu-22.04, cc: clang-14,   cxx: clang++-14,   stdlib: libc++, stdlib_version: "14"}
-          - {os: ubuntu-24.04, cc: clang-18,   cxx: clang++-18,   stdlib: libc++, stdlib_version: "18"}
-          - {os: ubuntu-24.04, cc: clang-20,   cxx: clang++-20,   stdlib: libc++, stdlib_version: "20"}
+          - {os: ubuntu-22.04, cc: gcc-11,   cxx: g++-11,     stdlib: libstdc++, toolset: gcc}
+          - {os: ubuntu-24.04, cc: gcc-14,   cxx: g++-14,     stdlib: libstdc++, toolset: gcc}
+          - {os: ubuntu-22.04, cc: clang-14, cxx: clang++-14, stdlib: libstdc++, toolset: llvm}
+          - {os: ubuntu-24.04, cc: clang-18, cxx: clang++-18, stdlib: libstdc++, toolset: llvm}
+          - {os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, stdlib: libstdc++, toolset: llvm}
+          - {os: ubuntu-22.04, cc: clang-14, cxx: clang++-14, stdlib: libc++,    toolset: llvm, stdlib_version: "14"}
+          - {os: ubuntu-24.04, cc: clang-18, cxx: clang++-18, stdlib: libc++,    toolset: llvm, stdlib_version: "18"}
+          - {os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, stdlib: libc++,    toolset: llvm, stdlib_version: "20"}
         cpp_std: [17, 20]
         exclude:
           - {cfg: {os: ubuntu-22.04, cc: clang-14, cxx: clang++-14, stdlib: libc++, stdlib_version: "14"}, cpp_std: 20}
@@ -68,7 +68,7 @@ jobs:
         run: ctest --test-dir build-Debug --output-on-failure
 
       - name: Configure CMake (Debug + GLIBCXX_DEBUG)
-        if: matrix.cfg.stdlib == 'libstdc++'
+        if: matrix.cfg.toolset == 'gcc'
         run: |
           cmake -S . -B build-glibcxx-debug \
             -G Ninja \
@@ -80,11 +80,11 @@ jobs:
             -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS"
 
       - name: Build Project (Debug + GLIBCXX_DEBUG)
-        if: matrix.cfg.stdlib == 'libstdc++'
+        if: matrix.cfg.toolset == 'gcc'
         run: cmake --build build-glibcxx-debug --parallel
 
       - name: Run Tests (Debug + GLIBCXX_DEBUG)
-        if: matrix.cfg.stdlib == 'libstdc++'
+        if: matrix.cfg.toolset == 'gcc'
         run: ctest --test-dir build-glibcxx-debug --output-on-failure
 
       - name: Configure CMake (Release)
