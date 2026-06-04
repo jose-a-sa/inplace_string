@@ -49,6 +49,8 @@
 #define QX_STL_LIBSTDCXX
 #elif defined(_MSVC_STL_VERSION) || defined(_CPPLIB_VER)
 #define QX_STL_MSVC
+#else
+// TODO(jose): what if this happens
 #endif
 
 #define QX_STRINGIFY_IMPL(x) #x
@@ -60,12 +62,14 @@
 #define QX_HAS_BUILTIN(x) 0
 #endif
 
+// __builtin_constant_p is a GCC + Clang builtin
 #if QX_HAS_BUILTIN(__builtin_constant_p)
 #define QX_IS_CONSTANT(x) __builtin_constant_p(x)
 #else
 #define QX_IS_CONSTANT(x) false
 #endif
 
+// __builtin_expect is a GCC + Clang builtin
 #if QX_HAS_BUILTIN(__builtin_expect) || defined(__GNUC__)
 #define QX_LIKELY(x) __builtin_expect(!!(x), 1)
 #define QX_UNLIKELY(x) __builtin_expect(!!(x), 0)
@@ -74,10 +78,10 @@
 #define QX_UNLIKELY(x) (x)
 #endif
 
-#if defined(_MSC_VER)
-#define QX_FORCE_INLINE __forceinline
-#elif defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__) || defined(__clang__)
 #define QX_FORCE_INLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define QX_FORCE_INLINE __forceinline
 #else
 #define QX_FORCE_INLINE inline
 #endif
@@ -90,16 +94,25 @@
 #define QX_COLD_NOINLINE
 #endif
 
+// __builtin_trap is a GCC + Clang builtin
 #if QX_HAS_BUILTIN(__builtin_trap) || defined(__GNUC__)
 #define QX_TRAP() __builtin_trap()
 #elif defined(_MSC_VER)
+// __debugbreak() alone doesn't mark the site as noreturn to the
+// optimizer; __assume(false) tells MSVC control never continues.
 #define QX_TRAP() (__debugbreak(), __assume(false))
 #else
 #define QX_TRAP() std::abort()
 #endif
 
-#if QX_HAS_BUILTIN(__builtin_verbose_trap)
+// __builtin_verbose_trap is Clang-only.
+// AppleClang < 17 shipped a 1-arg version; upstream Clang 18+ is 2-arg.
+#if defined(__clang__) && QX_HAS_BUILTIN(__builtin_verbose_trap)
+#if defined(__apple_build_version__) && __apple_build_version__ < 17000000
+#define QX_TRAP_WITH_MSG(tag, msg) __builtin_verbose_trap(msg)
+#else
 #define QX_TRAP_WITH_MSG(tag, msg) __builtin_verbose_trap(tag, msg)
+#endif
 #else
 #define QX_TRAP_WITH_MSG(tag, msg) QX_TRAP()
 #endif
