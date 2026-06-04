@@ -63,7 +63,7 @@
 #endif
 
 // __builtin_constant_p is a GCC + Clang builtin
-#if QX_HAS_BUILTIN(__builtin_constant_p)
+#if QX_HAS_BUILTIN(__builtin_constant_p) || defined(__GNUC__)
 #define QX_IS_CONSTANT(x) __builtin_constant_p(x)
 #else
 #define QX_IS_CONSTANT(x) false
