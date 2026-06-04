@@ -12,6 +12,12 @@
 #include <string_view>
 #include <type_traits>
 
+#if defined(__cpp_char8_t) && __cpp_char8_t >= 201811L
+#define QX_HAS_CHAR8_T 1
+#else
+#define QX_HAS_CHAR8_T 0
+#endif
+
 // contract hardening level (0: none, 1: all, default: debug-only)
 #ifndef QX_INPLACE_STRING_HARDENING
 #ifdef NDEBUG
@@ -79,7 +85,7 @@
 #if defined(__GNUC__) || defined(__clang__)
 #define QX_COLD_NOINLINE __attribute__((cold, noinline))
 #elif defined(_MSC_VER)
-#define QX_COLD_NOINLINE __declspec(noinline) /* MSVC lacks 'cold', but noinline is crucial */
+#define QX_COLD_NOINLINE __declspec(noinline)
 #else
 #define QX_COLD_NOINLINE
 #endif
@@ -87,7 +93,6 @@
 #if QX_HAS_BUILTIN(__builtin_trap) || defined(__GNUC__)
 #define QX_TRAP() __builtin_trap()
 #elif defined(_MSC_VER)
-// On MSVC, __assume(false) tells the optimizer this path never returns
 #define QX_TRAP() (__debugbreak(), __assume(false))
 #else
 #define QX_TRAP() std::abort()
@@ -303,19 +308,21 @@ template <class T>
 inline constexpr auto is_fancy_pointer_v = has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>;
 #endif
 
-template <class Ptr, std::enable_if_t<std::is_class_v<Ptr> && is_fancy_pointer_v<Ptr>, int> = 0>
-constexpr auto to_address(Ptr const& ptr) noexcept -> decltype(auto)
+template <class Ptr,
+          std::enable_if_t<std::is_class_v<std::remove_reference_t<Ptr>> && is_fancy_pointer_v<std::remove_reference_t<Ptr>>, int> = 0>
+constexpr auto to_address(Ptr&& ptr) noexcept -> decltype(auto)
 {
-    if constexpr (has_pointer_traits_to_address_v<Ptr>)
-        return std::pointer_traits<Ptr>::to_address(ptr);
+    using pointer = std::remove_reference_t<Ptr>;
+    if constexpr (has_pointer_traits_to_address_v<pointer>)
+        return std::pointer_traits<pointer>::to_address(std::forward<Ptr>(ptr));
 #if defined(QX_STL_LIBSTDCXX)
-    if constexpr (is_gnu_wrapped_iterator_v<Ptr>)
-        return to_address(ptr.base());
+    if constexpr (is_gnu_wrapped_iterator_v<pointer>)
+        return to_address(std::forward<Ptr>(ptr).base());
 #elif defined(QX_STL_MSVC)
-    if constexpr (is_msvc_wrapped_iterator_v<Ptr>)
-        return to_address(std::_Get_unwrapped(ptr));
+    if constexpr (is_msvc_wrapped_iterator_v<pointer>)
+        return to_address(std::_Get_unwrapped(std::forward<Ptr>(ptr)));
 #endif
-    return to_address(ptr.operator->());
+    return to_address(std::forward<Ptr>(ptr).operator->());
 }
 
 #endif // __cplusplus >= 202002L
@@ -421,10 +428,8 @@ class basic_inplace_string;
 template <std::size_t N>
 using inplace_string = basic_inplace_string<N, char>;
 
-#if QX_HAS_WIDE_CHARACTERS
 template <std::size_t N>
 using inplace_wstring = basic_inplace_string<N, wchar_t>;
-#endif
 
 #if QX_HAS_CHAR8_T
 template <std::size_t N>
@@ -1833,10 +1838,13 @@ private:
         if constexpr (intl::is_contiguous_iterator_v<Iterator> && std::is_same_v<value_type, intl::iter_value_t<Iterator>> &&
                       std::is_same_v<Iterator, Sentinel>)
         {
-            QX_ASSERT_CONTRACT(!intl::is_overlapping_range(intl::to_address(first), intl::to_address(last), dest),
+            auto const unwrapped_first = intl::to_address(std::move(first));
+            auto const unwrapped_last = intl::to_address(std::move(last));
+            QX_ASSERT_CONTRACT(!intl::is_overlapping_range(unwrapped_first, unwrapped_last, dest),
                                "copy_non_overlapping_range called with an overlapping range!");
-            traits_type::copy(dest, intl::to_address(first), last - first);
-            return dest + (last - first);
+            auto const n_copy = unwrapped_last - unwrapped_first;
+            traits_type::copy(dest, unwrapped_first, n_copy);
+            return dest + n_copy;
         }
 
         for (; first != last; ++first)
