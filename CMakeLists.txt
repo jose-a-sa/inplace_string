@@ -10,7 +10,7 @@ include(CMakePackageConfigHelpers)
 # ==============================================================================
 # Components
 # ==============================================================================
-set(${PROJECT_NAME}_COMPONENTS)
+set(PACKAGE_COMPONENTS)
 
 function(qx_add_component NAME)
   add_library(${NAME} INTERFACE)
@@ -18,8 +18,8 @@ function(qx_add_component NAME)
   target_compile_features(${NAME} INTERFACE cxx_std_17)
 
   # Don't install here — caller must add sources first
-  list(APPEND ${PROJECT_NAME}_COMPONENTS ${NAME})
-  set(${PROJECT_NAME}_COMPONENTS "${${PROJECT_NAME}_COMPONENTS}" PARENT_SCOPE)
+  list(APPEND PACKAGE_COMPONENTS ${NAME})
+  set(PACKAGE_COMPONENTS "${PACKAGE_COMPONENTS}" PARENT_SCOPE)
 endfunction()
 
 function(qx_install_component NAME)
@@ -86,10 +86,10 @@ install(
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake.in" [=[
 @PACKAGE_INIT@
 include(CMakeFindDependencyMacro)
-include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@-targets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/${CMAKE_FIND_PACKAGE_NAME}-targets.cmake")
 
 set(_found_components)
-foreach(_comp @qxlib_COMPONENTS@)
+foreach(_comp @PACKAGE_COMPONENTS@)
   if(NOT TARGET @PROJECT_NS@::${_comp})
     set(${CMAKE_FIND_PACKAGE_NAME}_${_comp}_FOUND FALSE)
   else()
@@ -101,7 +101,7 @@ endforeach()
 check_required_components(@PROJECT_NAME@)
 
 string(REPLACE ";" ", " _found_components "${_found_components}")
-message(STATUS "Found qxlib ${qxlib_VERSION}: ${CMAKE_CURRENT_LIST_FILE} (found components: ${_found_components})")
+message(STATUS "Found ${CMAKE_FIND_PACKAGE_NAME} ${${CMAKE_FIND_PACKAGE_NAME}_VERSION}: ${CMAKE_CURRENT_LIST_FILE} (found components: ${_found_components})")
 unset(_found_components)
 
 ]=])
