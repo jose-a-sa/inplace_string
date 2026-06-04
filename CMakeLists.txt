@@ -63,7 +63,6 @@ if(QX_BUILD_TESTS)
     target_include_directories("${_test_name}" PRIVATE
       "${CMAKE_CURRENT_SOURCE_DIR}/tests"
     )
-    set_target_properties("${_test_name}" PROPERTIES EXCLUDE_FROM_ALL TRUE)
     target_link_libraries("${_test_name}" PRIVATE
       GTest::gmock_main
       ${PROJECT_NS}::inplace_string
