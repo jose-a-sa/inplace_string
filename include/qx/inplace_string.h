@@ -12,12 +12,6 @@
 #include <string_view>
 #include <type_traits>
 
-#if defined(__cpp_char8_t) && __cpp_char8_t >= 201811L
-#define QX_HAS_CHAR8_T 1
-#else
-#define QX_HAS_CHAR8_T 0
-#endif
-
 // contract hardening level (0: none, 1: all, default: debug-only)
 #define QX_HARDENING_MODE_NONE 0
 #define QX_HARDENING_MODE_ALL 1
@@ -55,21 +49,23 @@
 #define QX_STRINGIFY_IMPL(x) #x
 #define QX_STRINGIFY(x) QX_STRINGIFY_IMPL(x)
 
-#ifdef __has_builtin
-#define QX_HAS_BUILTIN(x) __has_builtin(x)
-#else
-#define QX_HAS_BUILTIN(x) 0
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+#ifndef __has_include
+#define __has_include(x) 0
 #endif
 
 // __builtin_constant_p is a GCC + Clang builtin
-#if QX_HAS_BUILTIN(__builtin_constant_p) || defined(__GNUC__)
+#if __has_builtin(__builtin_constant_p) || defined(__GNUC__)
 #define QX_IS_CONSTANT(x) __builtin_constant_p(x)
 #else
 #define QX_IS_CONSTANT(x) false
 #endif
 
 // __builtin_expect is a GCC + Clang builtin
-#if QX_HAS_BUILTIN(__builtin_expect) || defined(__GNUC__)
+#if __has_builtin(__builtin_expect) || defined(__GNUC__)
 #define QX_LIKELY(x) __builtin_expect(!!(x), 1)
 #define QX_UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
@@ -94,7 +90,7 @@
 #endif
 
 // __builtin_trap is a GCC + Clang builtin
-#if QX_HAS_BUILTIN(__builtin_trap) || defined(__GNUC__)
+#if __has_builtin(__builtin_trap) || defined(__GNUC__)
 #define QX_TRAP() __builtin_trap()
 #elif defined(_MSC_VER)
 // __debugbreak() alone doesn't mark the site as noreturn to the
@@ -106,7 +102,7 @@
 
 // __builtin_verbose_trap is Clang-only.
 // AppleClang < 17 shipped a 1-arg version; upstream Clang 18+ is 2-arg.
-#if defined(__clang__) && QX_HAS_BUILTIN(__builtin_verbose_trap)
+#if defined(__clang__) && __has_builtin(__builtin_verbose_trap)
 #if defined(__apple_build_version__) && __apple_build_version__ < 17000000
 #define QX_TRAP_WITH_MSG(tag, msg) __builtin_verbose_trap(msg)
 #else
@@ -116,8 +112,16 @@
 #define QX_TRAP_WITH_MSG(tag, msg) QX_TRAP()
 #endif
 
+// char8_t
+#if defined(__cpp_char8_t) && __cpp_char8_t >= 201811L
+#define QX_HAS_CHAR8_T 1
+#else
+#define QX_HAS_CHAR8_T 0
+#endif
+
 namespace qx
 {
+
 namespace intl
 {
 
@@ -140,7 +144,7 @@ constexpr bool is_constant_evaluated() noexcept
 {
 #if defined(__cpp_lib_is_constant_evaluated) && __cpp_lib_is_constant_evaluated >= 201811L
     return std::is_constant_evaluated();
-#elif QX_HAS_BUILTIN(__builtin_is_constant_evaluated)
+#elif __has_builtin(__builtin_is_constant_evaluated)
     return __builtin_is_constant_evaluated();
 #else
     return false; // Fallback
@@ -227,50 +231,67 @@ struct is_contiguous_iterator<T*, void> : std::is_object<T>
 
 #if defined(QX_STL_LIBCPP) // libc++ (LLVM)
 
+#if __has_include(<__iterator/wrap_iter.h>)
+#include <__iterator/wrap_iter.h>
 template <class Iter>
 struct is_contiguous_iterator<std::__wrap_iter<Iter>, void> : is_contiguous_iterator<Iter>
 {};
+#endif // __has_include(<__iterator/wrap_iter.h>)
+
+#if __has_include(<__iterator/bounded_iter.h>)
+#include <__iterator/bounded_iter.h>
 template <class Iter>
 struct is_contiguous_iterator<std::__bounded_iter<Iter>, void> : is_contiguous_iterator<Iter>
 {};
+#endif // __has_include(<__iterator/bounded_iter.h>)
 
 #elif defined(QX_STL_LIBSTDCXX) // libstdc++ (GNU)
 
 template <class T>
 struct is_gnu_wrapped_iterator : std::false_type
 {};
-template <class Iter, class Cont, class Tag>
-struct is_gnu_wrapped_iterator<__gnu_debug::_Safe_iterator<Iter, Cont, Tag>> : std::true_type
-{};
-template <class Iter, class Cont>
-struct is_gnu_wrapped_iterator<__gnu_cxx::__normal_iterator<Iter, Cont>> : std::true_type
-{};
 template <class T>
 inline constexpr bool is_gnu_wrapped_iterator_v = is_gnu_wrapped_iterator<T>::value;
 
+#if __has_include(<bits/stl_iterator.h>)
+#include <bits/stl_iterator.h>
+template <class Iter, class Cont>
+struct is_gnu_wrapped_iterator<__gnu_cxx::__normal_iterator<Iter, Cont>> : std::true_type
+{};
 template <class Iter, class Cont>
 struct is_contiguous_iterator<__gnu_cxx::__normal_iterator<Iter, Cont>, void> : is_contiguous_iterator<Iter>
+{};
+#endif // __has_include(<bits/stl_iterator.h>)
+
+#if __has_include(<debug/safe_iterator.h>)
+#include <debug/safe_iterator.h>
+template <class Iter, class Cont, class Tag>
+struct is_gnu_wrapped_iterator<__gnu_debug::_Safe_iterator<Iter, Cont, Tag>> : std::true_type
 {};
 template <class Iter, class Cont, class Tag>
 struct is_contiguous_iterator<__gnu_debug::_Safe_iterator<Iter, Cont, Tag>, void> : is_contiguous_iterator<Iter>
 {};
+#endif // __has_include(<debug/safe_iterator.h>)
 
 #elif defined(QX_STL_MSVC) // MSVC STL
-#include <xutility>
 
-template <typename T, typename = void>
+template <class T, class = void>
 struct is_msvc_wrapped_iterator : std::false_type
 {};
-template <typename T>
-struct is_msvc_wrapped_iterator<T, std::void_t<decltype(std::_Get_unwrapped(std::declval<T&>()))>> : std::true_type
-{};
-template <typename T>
+template <class T>
 inline constexpr bool is_msvc_wrapped_iterator_v = is_msvc_wrapped_iterator<T>::value;
 
+#if __has_include(<xutility>)
+#include <xutility>
+template <class T>
+struct is_msvc_wrapped_iterator<T, std::void_t<decltype(std::_Get_unwrapped(std::declval<T&>()))>> : std::true_type
+{};
 template <class T>
 struct is_contiguous_iterator<T, std::enable_if_t<!std::is_pointer_v<T> && is_msvc_wrapped_iterator_v<T>>>
     : std::is_pointer<decltype(std::_Get_unwrapped(std::declval<T&>()))>
 {};
+#endif // __has_include(<xutility>)
+
 #endif
 #endif // __cplusplus >= 202002L
 
@@ -330,7 +351,7 @@ constexpr auto to_address(Ptr&& ptr) noexcept -> decltype(auto)
 {
     using pointer = std::remove_reference_t<Ptr>;
     if constexpr (has_pointer_traits_to_address_v<pointer>) // handlers the LLVM unwrapping
-        return std::pointer_traits<pointer>::to_address(std::forward<Ptr>(ptr)); 
+        return std::pointer_traits<pointer>::to_address(std::forward<Ptr>(ptr));
 #if defined(QX_STL_LIBSTDCXX)
     if constexpr (is_gnu_wrapped_iterator_v<pointer>)
         return to_address(std::forward<Ptr>(ptr).base());
@@ -347,10 +368,10 @@ constexpr auto to_address(Ptr&& ptr) noexcept -> decltype(auto)
 // iterator is either a pointer to an arithmetic type, or an iterator that is contiguous and has an arithmetic value type. This allows for
 // optimizations when copying from such iterators, while still being safe in the presence of overlapping ranges.
 
-template <typename Iter, typename = void>
+template <class Iter, class = void>
 struct is_trivial_contiguous_iterator : std::false_type
 {};
-template <typename T>
+template <class T>
 struct is_trivial_contiguous_iterator<T*, void> : std::is_arithmetic<T>
 {};
 template <class Iter>
