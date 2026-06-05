@@ -256,22 +256,18 @@ inline constexpr bool is_gnu_wrapped_iterator_v = is_gnu_wrapped_iterator<T>::va
 #if __has_include(<bits/stl_iterator.h>)
 #include <bits/stl_iterator.h>
 template <class Iter, class Cont>
-struct is_gnu_wrapped_iterator<__gnu_cxx::__normal_iterator<Iter, Cont>> : std::true_type
+struct is_gnu_wrapped_iterator<::__gnu_cxx::__normal_iterator<Iter, Cont>> : std::true_type
 {};
 template <class Iter, class Cont>
-struct is_contiguous_iterator<__gnu_cxx::__normal_iterator<Iter, Cont>, void> : is_contiguous_iterator<Iter>
+struct is_contiguous_iterator<::__gnu_cxx::__normal_iterator<Iter, Cont>, void> : is_contiguous_iterator<Iter>
+{};
+template <class Iter, class Cont, class Tag>
+struct is_gnu_wrapped_iterator<::__gnu_debug::_Safe_iterator<Iter, Cont, Tag>> : std::true_type
+{};
+template <class Iter, class Cont, class Tag>
+struct is_contiguous_iterator<::__gnu_debug::_Safe_iterator<Iter, Cont, Tag>, void> : is_contiguous_iterator<Iter>
 {};
 #endif // __has_include(<bits/stl_iterator.h>)
-
-#if __has_include(<debug/safe_iterator.h>)
-#include <debug/safe_iterator.h>
-template <class Iter, class Cont, class Tag>
-struct is_gnu_wrapped_iterator<__gnu_debug::_Safe_iterator<Iter, Cont, Tag>> : std::true_type
-{};
-template <class Iter, class Cont, class Tag>
-struct is_contiguous_iterator<__gnu_debug::_Safe_iterator<Iter, Cont, Tag>, void> : is_contiguous_iterator<Iter>
-{};
-#endif // __has_include(<debug/safe_iterator.h>)
 
 #elif defined(QX_STL_MSVC) // MSVC STL
 
