@@ -19,27 +19,26 @@
 #endif
 
 // contract hardening level (0: none, 1: all, default: debug-only)
-#ifndef QX_INPLACE_STRING_HARDENING
-#ifdef NDEBUG
-#define QX_INPLACE_STRING_HARDENING 0
-#else
-#define QX_INPLACE_STRING_HARDENING 1
-#endif
+#define QX_HARDENING_MODE_NONE 0
+#define QX_HARDENING_MODE_ALL 1
+
+#ifndef QX_HARDENING_MODE
+#define QX_HARDENING_MODE QX_HARDENING_MODE_NONE
 #endif
 
 // contract assert behaviour (default: IO-logging and trap)
-#define QX_INPLACE_STRING_ASSERT_NONE 0
-#define QX_INPLACE_STRING_ASSERT_TRAP 1
-#define QX_INPLACE_STRING_ASSERT_LOG_TRAP 2
-#define QX_INPLACE_STRING_ASSERT_ABORT 3
-#define QX_INPLACE_STRING_ASSERT_LOG_ABORT 4
+#define QX_ASSERT_MODE_NONE 0
+#define QX_ASSERT_MODE_TRAP 1
+#define QX_ASSERT_MODE_LOG_TRAP 2
+#define QX_ASSERT_MODE_ABORT 3
+#define QX_ASSERT_MODE_LOG_ABORT 4
 
-#ifndef QX_INPLACE_STRING_ASSERT_MODE
-#define QX_INPLACE_STRING_ASSERT_MODE QX_INPLACE_STRING_ASSERT_LOG_TRAP
+#ifndef QX_ASSERT_MODE
+#define QX_ASSERT_MODE QX_ASSERT_MODE_LOG_TRAP
 #else
-#if (QX_INPLACE_STRING_ASSERT_MODE > QX_INPLACE_STRING_ASSERT_LOG_ABORT)
-#undef QX_INPLACE_STRING_ASSERT_MODE
-#define QX_INPLACE_STRING_ASSERT_MODE QX_INPLACE_STRING_ASSERT_NONE
+#if (QX_ASSERT_MODE > QX_ASSERT_MODE_LOG_ABORT)
+#undef QX_ASSERT_MODE
+#define QX_ASSERT_MODE QX_ASSERT_MODE_NONE
 #endif
 #endif
 
@@ -155,23 +154,23 @@ inline QX_COLD_NOINLINE void v_contract_fail_handler(char const* msg)
     std::fflush(stderr);
 }
 
-#if QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_NONE
+#if QX_ASSERT_MODE == QX_ASSERT_MODE_NONE
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) ((void)0)
-#elif QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_TRAP
+#elif QX_ASSERT_MODE == QX_ASSERT_MODE_TRAP
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) (::qx::intl::is_constant_evaluated() ? QX_TRAP() : QX_TRAP_WITH_MSG(tag, msg))
-#elif QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_LOG_TRAP
+#elif QX_ASSERT_MODE == QX_ASSERT_MODE_LOG_TRAP
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg)                                                                                            \
     (::qx::intl::is_constant_evaluated() ? QX_TRAP() : (::qx::intl::v_contract_fail_handler(loc ": " msg), QX_TRAP_WITH_MSG(tag, msg)))
-#elif QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_ABORT
+#elif QX_ASSERT_MODE == QX_ASSERT_MODE_ABORT
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) (::qx::intl::is_constant_evaluated() ? QX_TRAP() : std::abort())
-#elif QX_INPLACE_STRING_ASSERT_MODE == QX_INPLACE_STRING_ASSERT_LOG_ABORT
+#elif QX_ASSERT_MODE == QX_ASSERT_MODE_LOG_ABORT
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg)                                                                                            \
     (::qx::intl::is_constant_evaluated() ? QX_TRAP() : (::qx::intl::v_contract_fail_handler(loc ": " msg), std::abort()))
 #else
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) ((void)0)
 #endif
 
-#if QX_INPLACE_STRING_HARDENING && QX_INPLACE_STRING_ASSERT_MODE
+#if (QX_HARDENING_MODE > QX_HARDENING_MODE_NONE) && (QX_ASSERT_MODE > QX_ASSERT_MODE_NONE)
 #define QX_ASSERT_CONTRACT(cond, msg)                                                                                                      \
     (QX_LIKELY(cond) ? ((void)0)                                                                                                           \
                      : QX_CONTRACT_FAIL_HANDLER("qxlib", __FILE__ ":" QX_STRINGIFY(__LINE__), "contract violation '" #cond "': " msg))
@@ -634,16 +633,12 @@ public:
         size_type const sz = size();
         if (n > sz)
         {
-            if (n > 0)
-            {
-                if (n > capacity() - sz) // TODO(jose): confirm
-                    intl::throw_length_error("basic_inplace_string");
-                set_size_and_null_terminate(sz + n); // TODO(jose): confirm
-            }
-            else
-            {
-                erase_to_end(n);
-            }
+            QX_ASSERT_CONTRACT(capacity() >= n, "inplace_string::resize_and_overwrite(n, op): n exceeds capacity");
+            set_size_and_null_terminate(n);
+        }
+        else
+        {
+            erase_to_end(n);
         }
         erase_to_end(std::move(op)(data(), static_cast<std::decay_t<decltype((n))>>(n)));
     };
@@ -664,14 +659,13 @@ public:
 
     const_reference operator[](size_type pos) const noexcept
     {
-        // TODO(jose): fix messages in the contract checks
-        QX_ASSERT_CONTRACT(pos < size(), "basic_inplace_string(const char*, n) detected nullptr");
+        QX_ASSERT_CONTRACT(pos < size(), "inplace_string(const char*, n): detected nullptr");
         return rep_.data[pos];
     }
 
     reference operator[](size_type pos) noexcept
     {
-        QX_ASSERT_CONTRACT(pos < size(), "basic_inplace_string(const char*, n) detected nullptr");
+        QX_ASSERT_CONTRACT(pos < size(), "inplace_string(const char*, n): detected nullptr");
         return rep_.data[pos];
     }
 
@@ -753,7 +747,7 @@ public:
 
     basic_inplace_string& append(CharT const* str)
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::append received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::append(CharT const*): received nullptr");
         return append(str, traits_type::length(str));
     }
 
@@ -921,7 +915,7 @@ public:
 
     basic_inplace_string& assign(CharT const* str, size_type n)
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "basic_inplace_string::assign received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::assign(char const*, n) received nullptr");
         if (n > capacity())
             intl::throw_length_error("basic_inplace_string");
         traits_type::move(data(), str, n);
@@ -931,7 +925,7 @@ public:
 
     basic_inplace_string& assign(CharT const* str)
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "basic_inplace_string::assign received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::::assign(char const*) received nullptr");
         return assign(str, traits_type::length(str));
     }
 
@@ -950,12 +944,13 @@ public:
         if constexpr (intl::has_iter_category_v<Iterator, std::forward_iterator_tag> && intl::is_trivial_contiguous_iterator_v<Iterator>)
         {
             auto const n = static_cast<size_type>(std::distance(first, last));
-            // TODO(jose): Missing capacity check ?
-            assign_trivial(first, last, n);
-            // TODO(jose): Missing return ?
+            assign_trivial(std::move(first), std::move(last), n);
+        }
+        else
+        {
+            assign_with_sentinel(std::move(first), std::move(last));
         }
 
-        assign_with_sentinel(first, last);
         return *this;
     }
 
@@ -1148,7 +1143,7 @@ public:
 
     basic_inplace_string& replace(size_type pos, size_type n1, CharT const* str, size_type n2)
     {
-        QX_ASSERT_CONTRACT(n2 == 0 || str != nullptr, "basic_inplace_string::replace received nullptr");
+        QX_ASSERT_CONTRACT(n2 == 0 || str != nullptr, "inplace_string::replace(pos, n1, char const*, n2) received nullptr");
 
         size_type const sz = size();
         if (pos > sz)
@@ -1731,7 +1726,6 @@ private:
         if constexpr (intl::has_iter_category_v<InputIterator, std::forward_iterator_tag>)
         {
             auto const sz = static_cast<size_type>(std::distance(first, last));
-            // TODO(jose): missing capacity check ?
             init_with_size(std::move(first), std::move(last), sz);
         }
         else
@@ -1752,14 +1746,15 @@ private:
     void assign_trivial(Iterator first, Sentinel /*last*/, size_type n)
     {
         QX_ASSERT_CONTRACT(intl::is_trivial_contiguous_iterator_v<Iterator>, "The iterator type given to `assign_trivial` must be trivial");
+        QX_ASSERT_CONTRACT(n <= capacity(), "assign_trivial(Iterator, Sentinel, size_type) was called with not enough capacity");
 
-        const_pointer const src = intl::to_address(first);
-        pointer const dst = data();
+        const_pointer const src = intl::to_address(std::move(first));
+        pointer const ptr = data();
 
-        if (intl::is_overlapping_range(dst, dst + n, src))
-            traits_type::move(dst, src, n);
+        if (intl::is_overlapping_range(ptr, ptr + n, src))
+            traits_type::move(ptr, src, n);
         else
-            traits_type::copy(dst, src, n);
+            traits_type::copy(ptr, src, n);
 
         set_size_and_null_terminate(n);
     }
@@ -1781,8 +1776,11 @@ private:
     }
 
     template <class Iterator, class Sentinel>
-    void init_with_size(Iterator first, Sentinel last, size_type /*sz*/)
+    void init_with_size(Iterator first, Sentinel last, size_type sz)
     {
+        if (sz > max_size())
+            intl::throw_length_error("basic_inplace_string");
+
         // strong exception guarantee: if an exception is thrown during initialization, the string is left in a valid empty state
         try
         {
@@ -1835,7 +1833,7 @@ private:
 
     void erase_to_end(size_type pos)
     {
-        QX_ASSERT_CONTRACT(pos <= capacity(), "erase_to_end to erase at position outside the strings capacity!");
+        QX_ASSERT_CONTRACT(pos <= capacity(), "inplace_string::erase_to_end(pos) trying to erase positions outside the capacity");
         set_size_and_null_terminate(pos);
     }
 
