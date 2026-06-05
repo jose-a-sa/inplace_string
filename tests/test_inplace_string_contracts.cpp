@@ -1,23 +1,16 @@
-#include <cstddef>
+#define QX_HARDENING_MODE QX_HARDENING_MODE_ALL
+#define QX_ASSERT_MODE QX_ASSERT_MODE_LOG_TRAP
+
 #include <qx/inplace_string.h>
 
 #include <gtest/gtest.h>
-
-// ---------------------------------------------------------
-// Custom Macro for Safe Death Testing
-// ---------------------------------------------------------
-#ifndef NDEBUG
-#define EXPECT_DEATH_IF_NOT_DEBUG(statement, regex) EXPECT_DEATH(statement, regex)
-#else
-#define EXPECT_DEATH_IF_NOT_DEBUG(statement, regex) GTEST_SKIP() << "Skipping contract death test in Release mode to prevent UB."
-#endif
 
 // ---------------------------------------------------------
 // Construction & Initialization Contracts
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, NullPointerConstructorDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             char const* null_str = nullptr;
             qx::inplace_string<10> const s(null_str);
@@ -27,7 +20,7 @@ TEST(InplaceStringContractTest, NullPointerConstructorDeath)
 
 TEST(InplaceStringContractTest, NullPointerConstructorWithSizeDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             char const* null_str = nullptr;
             qx::inplace_string<10> const s(null_str, 5);
@@ -40,7 +33,7 @@ TEST(InplaceStringContractTest, NullPointerConstructorWithSizeDeath)
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, OperatorBracketOutOfBoundsDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> const s("abc");
             char const volatile c = s[5]; // 5 >= size()
@@ -51,7 +44,7 @@ TEST(InplaceStringContractTest, OperatorBracketOutOfBoundsDeath)
 
 TEST(InplaceStringContractTest, FrontOnEmptyDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> const s;
             char const volatile c = s.front();
@@ -62,7 +55,7 @@ TEST(InplaceStringContractTest, FrontOnEmptyDeath)
 
 TEST(InplaceStringContractTest, BackOnEmptyDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> const s;
             char const volatile c = s.back();
@@ -76,7 +69,7 @@ TEST(InplaceStringContractTest, BackOnEmptyDeath)
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, PopBackEmptyDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> s;
             s.pop_back();
@@ -86,7 +79,7 @@ TEST(InplaceStringContractTest, PopBackEmptyDeath)
 
 TEST(InplaceStringContractTest, AppendNullPointerDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> s("abc");
             char const* null_str = nullptr;
@@ -97,7 +90,7 @@ TEST(InplaceStringContractTest, AppendNullPointerDeath)
 
 TEST(InplaceStringContractTest, AssignNullPointerDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> s;
             char const* null_str = nullptr;
@@ -108,7 +101,7 @@ TEST(InplaceStringContractTest, AssignNullPointerDeath)
 
 TEST(InplaceStringContractTest, InsertNullPointerDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> s("ac");
             char const* null_str = nullptr;
@@ -119,7 +112,7 @@ TEST(InplaceStringContractTest, InsertNullPointerDeath)
 
 TEST(InplaceStringContractTest, ReplaceNullPointerDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> s("abc");
             char const* null_str = nullptr;
@@ -133,7 +126,7 @@ TEST(InplaceStringContractTest, ReplaceNullPointerDeath)
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, EraseEndIteratorDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> s("abc");
             s.erase(s.end());
@@ -143,7 +136,7 @@ TEST(InplaceStringContractTest, EraseEndIteratorDeath)
 
 TEST(InplaceStringContractTest, EraseInvalidIteratorRangeDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> s("abc");
             // first > last
@@ -157,7 +150,7 @@ TEST(InplaceStringContractTest, EraseInvalidIteratorRangeDeath)
 // ---------------------------------------------------------
 TEST(InplaceStringContractTest, FindNullPointerDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> const s("abc");
             char const* null_str = nullptr;
@@ -168,7 +161,7 @@ TEST(InplaceStringContractTest, FindNullPointerDeath)
 
 TEST(InplaceStringContractTest, CompareNullPointerDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> s("abc");
             char const* null_str = nullptr;
@@ -179,7 +172,7 @@ TEST(InplaceStringContractTest, CompareNullPointerDeath)
 
 TEST(InplaceStringContractTest, OperatorEqualsNullPointerDeath)
 {
-    EXPECT_DEATH_IF_NOT_DEBUG(
+    EXPECT_DEATH(
         {
             qx::inplace_string<10> s("abc");
             char const* null_str = nullptr;

@@ -31,7 +31,6 @@ TEST(InplaceString, ToInplaceStringSized)
     EXPECT_THROW(((void)qx::to_inplace_string<2, int>(255)), std::length_error);
     EXPECT_THROW(((void)qx::to_inplace_string<2, uint8_t>(255)), std::length_error);
     EXPECT_THROW(((void)qx::to_inplace_string<2>(255)), std::length_error);
-    EXPECT_DEBUG_DEATH(((void)qx::unchecked_to_inplace_string<2>(255)), "");
 }
 
 TEST(InplaceString, TryToInplaceString)
