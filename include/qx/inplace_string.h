@@ -230,8 +230,12 @@ struct is_contiguous_iterator<T*, void> : std::is_object<T>
 template <class Iter>
 struct is_contiguous_iterator<std::__wrap_iter<Iter>, void> : is_contiguous_iterator<Iter>
 {};
+template <class Iter>
+struct is_contiguous_iterator<std::__bounded_iter<Iter>, void> : is_contiguous_iterator<Iter>
+{};
 
 #elif defined(QX_STL_LIBSTDCXX) // libstdc++ (GNU)
+
 template <class T>
 struct is_gnu_wrapped_iterator : std::false_type
 {};
@@ -325,8 +329,8 @@ template <class Ptr,
 constexpr auto to_address(Ptr&& ptr) noexcept -> decltype(auto)
 {
     using pointer = std::remove_reference_t<Ptr>;
-    if constexpr (has_pointer_traits_to_address_v<pointer>)
-        return std::pointer_traits<pointer>::to_address(std::forward<Ptr>(ptr));
+    if constexpr (has_pointer_traits_to_address_v<pointer>) // handlers the LLVM unwrapping
+        return std::pointer_traits<pointer>::to_address(std::forward<Ptr>(ptr)); 
 #if defined(QX_STL_LIBSTDCXX)
     if constexpr (is_gnu_wrapped_iterator_v<pointer>)
         return to_address(std::forward<Ptr>(ptr).base());
