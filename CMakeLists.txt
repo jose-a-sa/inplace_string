@@ -9,51 +9,48 @@ if(NOT DEFINED CMAKE_CXX_EXTENSIONS)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(PROJECT_NS qx)
-option(QX_BUILD_TESTS "Build tests for qxlib" ${PROJECT_IS_TOP_LEVEL})
-
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+
+set(PROJECT_NAMESPACE qx)
+set(PROJECT_COMPONENTS)
 
 # ==============================================================================
 # Components
 # ==============================================================================
-set(PACKAGE_COMPONENTS)
+add_library(inplace_string INTERFACE)
+add_library(${PROJECT_NAMESPACE}::inplace_string ALIAS inplace_string)
+target_compile_features(inplace_string INTERFACE cxx_std_17)
+list(APPEND PROJECT_COMPONENTS inplace_string)
 
-function(qx_add_component NAME)
-  add_library(${NAME} INTERFACE)
-  add_library(${PROJECT_NS}::${NAME} ALIAS ${NAME})
-  target_compile_features(${NAME} INTERFACE cxx_std_17)
-
-  # Don't install here — caller must add sources first
-  list(APPEND PACKAGE_COMPONENTS ${NAME})
-  set(PACKAGE_COMPONENTS "${PACKAGE_COMPONENTS}" PARENT_SCOPE)
-endfunction()
-
-function(qx_install_component NAME)
-  install(TARGETS ${NAME}
-    EXPORT ${PROJECT_NAME}-config
-    FILE_SET HEADERS
-    COMPONENT ${NAME}
-  )
-endfunction()
-
-qx_add_component(inplace_string)
 target_sources(inplace_string INTERFACE
-  FILE_SET HEADERS 
+  FILE_SET HEADERS
   BASE_DIRS "include"
   FILES "include/qx/inplace_string.h"
 )
-qx_install_component(inplace_string)
+
+install(TARGETS inplace_string
+  EXPORT ${PROJECT_NAME}-config
+  FILE_SET HEADERS
+  COMPONENT inplace_string
+)
 
 # ==============================================================================
 # Testing
 # ==============================================================================
+option(QX_BUILD_TESTS "Build tests for qxlib" ${PROJECT_IS_TOP_LEVEL})
 
 if(QX_BUILD_TESTS)
   enable_testing()
   include(GoogleTest)
   include(FetchContent)
+
+  FetchContent_Declare(fmtlib
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG 12.1.0
+  )
+  set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
+  # FetchContent_MakeAvailable(fmtlib)
 
   FetchContent_Declare(googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
@@ -73,7 +70,8 @@ if(QX_BUILD_TESTS)
     )
     target_link_libraries("${_test_name}" PRIVATE
       GTest::gmock_main
-      ${PROJECT_NS}::inplace_string
+      # fmt::fmt
+      ${PROJECT_NAMESPACE}::inplace_string
     )
     gtest_discover_tests("${_test_name}")
   endforeach()
@@ -87,7 +85,7 @@ endif()
 install(
   EXPORT "${PROJECT_NAME}-config"
   FILE "${PROJECT_NAME}-targets.cmake"
-  NAMESPACE ${PROJECT_NS}::
+  NAMESPACE ${PROJECT_NAMESPACE}::
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
 )
 
@@ -96,8 +94,9 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake.in" [=[
 include(CMakeFindDependencyMacro)
 include("${CMAKE_CURRENT_LIST_DIR}/${CMAKE_FIND_PACKAGE_NAME}-targets.cmake")
 
+set(_available_components @PACKAGE_COMPONENTS@)
 set(_found_components)
-foreach(_comp @PACKAGE_COMPONENTS@)
+foreach(_comp _available_components)
   if(NOT TARGET @PROJECT_NS@::${_comp})
     set(${CMAKE_FIND_PACKAGE_NAME}_${_comp}_FOUND FALSE)
   else()
@@ -111,7 +110,7 @@ check_required_components(@PROJECT_NAME@)
 string(REPLACE ";" ", " _found_components "${_found_components}")
 message(STATUS "Found ${CMAKE_FIND_PACKAGE_NAME} ${${CMAKE_FIND_PACKAGE_NAME}_VERSION}: ${CMAKE_CURRENT_LIST_FILE} (found components: ${_found_components})")
 unset(_found_components)
-
+unset(_available_components)
 ]=])
 
 configure_package_config_file(

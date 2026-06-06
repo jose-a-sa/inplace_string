@@ -47,7 +47,7 @@ TEST(InplaceStringInsertTest, InsertIterator)
 TEST(InplaceStringModifiersTest, PushBackAndPopBack)
 {
     qx::inplace_string<10> s;
-    
+
     // Test push_back on empty and populated string
     s.push_back('a');
     s.push_back('b');
@@ -95,7 +95,7 @@ TEST(InplaceStringSelfTest, SelfAssignmentAndCopy)
     qx::inplace_string<15> s("self");
 
     // 1. Copy self-assignment
-    s = s; 
+    s = s;
     EXPECT_STREQ(s.c_str(), "self");
 
     // 2. Move self-assignment

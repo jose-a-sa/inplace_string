@@ -16,6 +16,7 @@ Checks: >
     -misc-unconventional-assign-operator,
     -modernize-use-trailing-return-type,
     -hicpp-braces-around-statements,
+    -hicpp-uppercase-literal-suffix,
     -modernize-use-trailing-return-type,
     -cppcoreguidelines-avoid-magic-numbers,
     -cppcoreguidelines-pro-type-reinterpret-cast,
@@ -27,4 +28,5 @@ Checks: >
     -google-readability-braces-around-statements,
     -bugprone-easily-swappable-parameters,
     -readability-identifier-length,
+    -readability-uppercase-literal-suffix,
     -cppcoreguidelines-macro-usage

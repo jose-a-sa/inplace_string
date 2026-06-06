@@ -4,8 +4,6 @@
 
 #include "string_api_tester.h"
 
-
-
 TEST(InplaceStringSApiTest, FindFirstNotOfAndFindLastOf)
 {
     qx::inplace_string<20> const s("hello world");

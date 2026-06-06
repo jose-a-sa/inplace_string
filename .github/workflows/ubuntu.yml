@@ -67,7 +67,7 @@ jobs:
       - name: Run Tests (Debug)
         run: ctest --test-dir build-Debug --output-on-failure
 
-      - name: Configure CMake (Debug + GLIBCXX_DEBUG)
+      - name: Configure CMake (Debug + libstdc++ _GLIBCXX_DEBUG)
         if: matrix.cfg.stdlib == 'libstdc++'
         run: |
           cmake -S . -B build-glibcxx-debug \
@@ -79,13 +79,33 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
             -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS"
 
-      - name: Build Project (Debug + GLIBCXX_DEBUG)
+      - name: Build Project (Debug + libstdc++ _GLIBCXX_DEBUG)
         if: matrix.cfg.stdlib == 'libstdc++'
         run: cmake --build build-glibcxx-debug --parallel
 
-      - name: Run Tests (Debug + GLIBCXX_DEBUG)
+      - name: Run Tests (Debug + libstdc++ _GLIBCXX_DEBUG)
         if: matrix.cfg.stdlib == 'libstdc++'
         run: ctest --test-dir build-glibcxx-debug --output-on-failure
+
+      - name: Configure CMake (Debug + libc++ hardening=debug)
+        if: matrix.cfg.stdlib == 'libc++'
+        run: |
+          cmake -S . -B build-libcxx-hardened \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+            -DCMAKE_CXX_FLAGS="$CXXFLAGS -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG" \
+            -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
+            -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS"
+
+      - name: Build Project (Debug + libc++ hardening=debug)
+        if: matrix.cfg.stdlib == 'libc++'
+        run: cmake --build build-libcxx-hardened --parallel
+
+      - name: Run Tests (Debug + libc++ hardening=debug)
+        if: matrix.cfg.stdlib == 'libc++'
+        run: ctest --test-dir build-libcxx-hardened --output-on-failure
 
       - name: Configure CMake (Release)
         run: |
@@ -103,3 +123,23 @@ jobs:
 
       - name: Run Tests (Release)
         run: ctest --test-dir build-Release --output-on-failure
+
+      - name: Configure CMake (Release + libc++ hardening=fast)
+        if: matrix.cfg.stdlib == 'libc++'
+        run: |
+          cmake -S . -B build-Release-hardened \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+            -DCMAKE_CXX_FLAGS="$CXXFLAGS -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST" \
+            -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
+            -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS"
+
+      - name: Build Project (Release + libc++ hardening=fast)
+        if: matrix.cfg.stdlib == 'libc++'
+        run: cmake --build build-Release-hardened --parallel
+
+      - name: Run Tests (Release + libc++ hardening=fast)
+        if: matrix.cfg.stdlib == 'libc++'
+        run: ctest --test-dir build-Release-hardened --output-on-failure
