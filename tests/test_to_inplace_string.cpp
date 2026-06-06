@@ -1,5 +1,6 @@
 #include <gmock/gmock.h>
 
+#include <array>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -10,6 +11,17 @@
 
 #include "matchers.h"
 #include <qx/inplace_string.h>
+
+#ifndef M_PI
+#define M_PI 3.141592653589793238462643383279502884
+#endif
+#ifndef M_E
+#define M_E 2.718281828459045235360287471352662498
+#endif
+#ifndef M_SQRT2
+#define M_SQRT2 1.414213562373095048801688724209698079
+#endif
+
 namespace
 {
 
@@ -117,7 +129,11 @@ TEST(InplaceString, ToInplaceString)
 
 TEST(InplaceString, RoundTripConversionDouble)
 {
-    auto test_cases = {
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 200000
+    GTEST_SKIP() << "libc++ < 20 does not support floating-point std::from_chars";
+#endif
+
+    auto test_cases = std::array{
         // Zeros
         +0.0,
         -0.0,
@@ -207,7 +223,11 @@ TEST(InplaceString, RoundTripConversionDouble)
 
 TEST(InplaceString, RoundTripConversionFloat)
 {
-    auto test_cases = {
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 200000
+    GTEST_SKIP() << "libc++ < 20 does not support floating-point std::from_chars";
+#endif
+
+    auto test_cases = std::array{
         // Zeros
         +0.0f,
         -0.0f,
