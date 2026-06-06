@@ -1,15 +1,11 @@
 #include <gmock/gmock.h>
 
-#include <array>
-#include <charconv>
-#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <stdexcept>
 #include <string_view>
 
-#include "matchers.h"
 #include <qx/inplace_string.h>
 
 #ifndef M_PI
@@ -128,7 +124,12 @@ TEST(InplaceString, ToInplaceString)
 }
 
 // Disable following tests that require std::from_chars for libc++19 and lower that was only complete for floating point numbers
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 200000
+#if defined(_LIBCPP_VERSION) && (_LIBCPP_VERSION < 1000 ? _LIBCPP_VERSION : _LIBCPP_VERSION / 10000) < 20
+#include "matchers.h"
+
+#include <array>
+#include <charconv>
+#include <cmath>
 
 TEST(InplaceString, RoundTripConversionDouble)
 {
