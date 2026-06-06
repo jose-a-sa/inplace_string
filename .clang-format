@@ -6,11 +6,15 @@ IndentWidth: 4
 TabWidth: 4
 AccessModifierOffset: -4
 UseTab: Never
-ContinuationIndentWidth: 4
 
 AllowShortFunctionsOnASingleLine: InlineOnly
 PackConstructorInitializers: Never 
 BreakConstructorInitializers: BeforeComma
+
+AlignAfterOpenBracket: BlockIndent
+ContinuationIndentWidth: 4
+BinPackArguments: false
+BinPackParameters: false
 
 # ConstructorInitializerIndentWidth: 4
 # BreakConstructorInitializers: BeforeColon

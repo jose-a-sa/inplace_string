@@ -139,6 +139,18 @@ template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 #endif // __cplusplus >= 202002L
 
+// std::type_identity (C++20)
+
+#if __cplusplus >= 202002L
+using std::type_identity;
+using std::type_identity_t;
+#else
+template<class T>
+struct type_identity { using type = T; };
+template <class T>
+using type_identity_t = typename type_identity<T>::type;
+#endif // __cplusplus >= 202002L
+
 // std::is_constant_evaluated() (C++20)
 
 constexpr bool is_constant_evaluated() noexcept
@@ -342,8 +354,9 @@ template <class T>
 inline constexpr auto is_fancy_pointer_v = has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>;
 #endif
 
-template <class Ptr,
-          std::enable_if_t<std::is_class_v<std::remove_reference_t<Ptr>> && is_fancy_pointer_v<std::remove_reference_t<Ptr>>, int> = 0>
+template <
+    class Ptr,
+    std::enable_if_t<std::is_class_v<std::remove_reference_t<Ptr>> && is_fancy_pointer_v<std::remove_reference_t<Ptr>>, int> = 0>
 constexpr auto to_address(Ptr&& ptr) noexcept -> decltype(auto)
 {
     using pointer = std::remove_reference_t<Ptr>;
@@ -393,8 +406,9 @@ inline constexpr bool is_less_than_comparable_v = is_less_than_comparable<T, U>:
 
 template <class CharT, class Traits, class T>
 struct convertible_to_string_view
-    : public std::integral_constant<bool, std::is_convertible_v<T const&, std::basic_string_view<CharT, Traits>> &&
-                                              !std::is_convertible_v<T const&, CharT const*>>
+    : public std::integral_constant<
+          bool,
+          std::is_convertible_v<T const&, std::basic_string_view<CharT, Traits>> && !std::is_convertible_v<T const&, CharT const*>>
 {};
 template <class CharT, class Traits, class T>
 inline constexpr bool convertible_to_string_view_v = convertible_to_string_view<CharT, Traits, T>::value;
@@ -491,8 +505,9 @@ class basic_inplace_string
 {
     static_assert(!std::is_array_v<CharT>, "Character type of basic_inplace_string must not be an array");
     static_assert(std::is_standard_layout_v<CharT>, "Character type of basic_inplace_string must be standard-layout");
-    static_assert(std::is_trivially_default_constructible_v<CharT>,
-                  "Character type of basic_inplace_string must be trivially default constructible");
+    static_assert(
+        std::is_trivially_default_constructible_v<CharT>, "Character type of basic_inplace_string must be trivially default constructible"
+    );
     static_assert(std::is_trivially_copyable_v<CharT>, "Character type of basic_inplace_string must be trivially copyable");
     static_assert(std::is_same_v<CharT, typename Traits::char_type>, "Traits::char_type must be the same type as CharT");
 
@@ -504,7 +519,8 @@ class basic_inplace_string
 
     template <class U>
     using enable_if_unsame_string_like_t = std::enable_if_t<
-        intl::convertible_to_string_view_v<CharT, Traits, U> && !std::is_same_v<intl::remove_cvref_t<U>, basic_inplace_string>, int>;
+        intl::convertible_to_string_view_v<CharT, Traits, U> && !std::is_same_v<intl::remove_cvref_t<U>, basic_inplace_string>,
+        int>;
 
 public:
     using traits_type = Traits;
@@ -662,7 +678,7 @@ public:
         {
             erase_to_end(n);
         }
-        erase_to_end(std::move(op)(data(), static_cast<std::decay_t<decltype((n))>>(n)));
+        erase_to_end(std::move(op)(data(), static_cast<size_type>(n)));
     };
 
     // ReSharper disable once CppMemberFunctionMayBeConst
@@ -2031,19 +2047,24 @@ public:
 #endif
 
 private:
-    //
-    using compressed_size_type = intl::min_size_t<N>;
-
     // The actual size type used for storing the size of the string. It is chosen based on the maximum size of the
     // string (N) to save space. It is guaranteed to be large enough to store any size up to N, and it is an unsigned
     // integer type for simplicity of implementation.
     template <class SizeT, class T, std::size_t M>
     struct alignas(size_type) inplace_string_storage
     {
-        SizeT size{};  // NOLINT(*-non-private-member-variables-in-classes)
+        union // NOLINT(*-non-private-member-variables-in-classes)
+        {
+            SizeT size{};
+            T pad; //< ensures similar layout to libc++ short representation
+        };
         T data[M + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
+
         constexpr inplace_string_storage() noexcept { data[0] = T{}; } // NOTE: to avoid full buffer init
     };
+
+    // internal type used to store the size information, automatically changes between capacities
+    using compressed_size_type = intl::min_size_t<N>;
 
     // inplace_string representation
     inplace_string_storage<compressed_size_type, CharT, N> rep_{};
@@ -2202,8 +2223,10 @@ private:
         {
             auto const unwrapped_first = intl::to_address(std::move(first));
             auto const unwrapped_last = intl::to_address(std::move(last));
-            QX_ASSERT_CONTRACT(!intl::is_overlapping_range(unwrapped_first, unwrapped_last, dest),
-                               "copy_non_overlapping_range called with an overlapping range!");
+            QX_ASSERT_CONTRACT(
+                !intl::is_overlapping_range(unwrapped_first, unwrapped_last, dest),
+                "copy_non_overlapping_range called with an overlapping range!"
+            );
             auto const n_copy = unwrapped_last - unwrapped_first;
             traits_type::copy(dest, unwrapped_first, n_copy);
             return dest + n_copy;
@@ -2214,8 +2237,8 @@ private:
         return dest;
     }
 
-    static value_type const* search_substring(value_type const* first1, value_type const* last1, value_type const* first2,
-                                              value_type const* last2) noexcept
+    static value_type const*
+    search_substring(value_type const* first1, value_type const* last1, value_type const* first2, value_type const* last2) noexcept
     {
         std::ptrdiff_t const len2 = last2 - first2;
         if (len2 == 0)

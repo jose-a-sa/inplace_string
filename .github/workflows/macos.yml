@@ -34,7 +34,7 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
-            -DCMAKE_CXX_STANDARD_REQUIRED=ON 
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON
 
       - name: Build Project (Debug)
         run: cmake --build build-Debug --parallel
@@ -42,16 +42,46 @@ jobs:
       - name: Run Tests (Debug)
         run: ctest --test-dir build-Debug --output-on-failure
 
+      - name: Configure CMake (Debug + libc++ hardening=debug)
+        run: |
+          cmake -S . -B build-libcxx-hardened \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+            -DCMAKE_CXX_FLAGS="-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG"
+
+      - name: Build Project (Debug + libc++ hardening=debug)
+        run: cmake --build build-libcxx-hardened --parallel
+
+      - name: Run Tests (Debug + libc++ hardening=debug)
+        run: ctest --test-dir build-libcxx-hardened --output-on-failure
+
       - name: Configure CMake (Release)
         run: |
           cmake -S . -B build-Release \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
-            -DCMAKE_CXX_STANDARD_REQUIRED=ON 
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON
 
       - name: Build Project (Release)
         run: cmake --build build-Release --parallel
 
       - name: Run Tests (Release)
         run: ctest --test-dir build-Release --output-on-failure
+
+      - name: Configure CMake (Release + libc++ hardening=fast)
+        run: |
+          cmake -S . -B build-Release-hardened \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+            -DCMAKE_CXX_FLAGS="-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST"
+
+      - name: Build Project (Release + libc++ hardening=fast)
+        run: cmake --build build-Release-hardened --parallel
+
+      - name: Run Tests (Release + libc++ hardening=fast)
+        run: ctest --test-dir build-Release-hardened --output-on-failure
