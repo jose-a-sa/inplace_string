@@ -1,7 +1,8 @@
 #include <gmock/gmock.h>
 
+#include <charconv>
+#include <cmath>
 #include <cstdint>
-#include <gtest/gtest.h>
 #include <initializer_list>
 #include <limits>
 #include <stdexcept>
