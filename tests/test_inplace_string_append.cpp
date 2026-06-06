@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <list>
 #include <vector>
 
 // 1. Appending another inplace_string
