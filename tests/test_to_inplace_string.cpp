@@ -127,12 +127,11 @@ TEST(InplaceString, ToInplaceString)
     );
 }
 
+// Disable following tests that require std::from_chars for libc++19 and lower that was only complete for floating point numbers
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 200000
+
 TEST(InplaceString, RoundTripConversionDouble)
 {
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 200000
-    GTEST_SKIP() << "libc++ < 20 does not support floating-point std::from_chars";
-#endif
-
     auto test_cases = std::array{
         // Zeros
         +0.0,
@@ -223,10 +222,6 @@ TEST(InplaceString, RoundTripConversionDouble)
 
 TEST(InplaceString, RoundTripConversionFloat)
 {
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 200000
-    GTEST_SKIP() << "libc++ < 20 does not support floating-point std::from_chars";
-#endif
-
     auto test_cases = std::array{
         // Zeros
         +0.0f,
@@ -305,3 +300,5 @@ TEST(InplaceString, RoundTripConversionFloat)
         EXPECT_STREQ(from_chars.c_str(), parsed_str.c_str());
     }
 }
+
+#endif // defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 200000
