@@ -14,19 +14,23 @@
 #include <type_traits>
 
 // contract hardening level (0: none, 1: all, default: debug-only)
+#ifndef QX_HARDENING_MODE_NONE
 #define QX_HARDENING_MODE_NONE 0
 #define QX_HARDENING_MODE_ALL 1
+#endif
 
 #ifndef QX_HARDENING_MODE
 #define QX_HARDENING_MODE QX_HARDENING_MODE_NONE
 #endif
 
 // contract assert behaviour (default: IO-logging and trap)
+#ifndef QX_ASSERT_MODE_NONE
 #define QX_ASSERT_MODE_NONE 0
 #define QX_ASSERT_MODE_TRAP 1
 #define QX_ASSERT_MODE_LOG_TRAP 2
 #define QX_ASSERT_MODE_ABORT 3
 #define QX_ASSERT_MODE_LOG_ABORT 4
+#endif
 
 #ifndef QX_ASSERT_MODE
 #define QX_ASSERT_MODE QX_ASSERT_MODE_LOG_TRAP
@@ -37,6 +41,7 @@
 #endif
 #endif
 
+#if !defined(QX_STL_LIBCPP) && !defined(QX_STL_LIBSTDCXX) && !defined(QX_STL_MSVC)
 #if defined(_LIBCPP_VERSION)
 #define QX_STL_LIBCPP
 #elif defined(__GLIBCXX__)
@@ -46,10 +51,14 @@
 #else
 // TODO(jose): what if this happens
 #endif
+#endif
 
+#ifndef QX_STRINGIFY
 #define QX_STRINGIFY_IMPL(x) #x
 #define QX_STRINGIFY(x) QX_STRINGIFY_IMPL(x)
+#endif
 
+// set __has_builtin when not defined
 #ifndef __has_builtin
 #define __has_builtin(x) 0
 #endif
@@ -59,13 +68,16 @@
 #endif
 
 // __builtin_constant_p is a GCC + Clang builtin
+#ifndef QX_IS_CONSTANT
 #if __has_builtin(__builtin_constant_p) || defined(__GNUC__)
 #define QX_IS_CONSTANT(x) __builtin_constant_p(x)
 #else
 #define QX_IS_CONSTANT(x) false
 #endif
+#endif
 
 // __builtin_expect is a GCC + Clang builtin
+#ifndef QX_LIKELY
 #if __has_builtin(__builtin_expect) || defined(__GNUC__)
 #define QX_LIKELY(x) __builtin_expect(!!(x), 1)
 #define QX_UNLIKELY(x) __builtin_expect(!!(x), 0)
@@ -73,7 +85,9 @@
 #define QX_LIKELY(x) (x)
 #define QX_UNLIKELY(x) (x)
 #endif
+#endif
 
+#ifndef QX_FORCE_INLINE
 #if defined(__GNUC__) || defined(__clang__)
 #define QX_FORCE_INLINE inline __attribute__((always_inline))
 #elif defined(_MSC_VER)
@@ -81,7 +95,9 @@
 #else
 #define QX_FORCE_INLINE inline
 #endif
+#endif
 
+#ifndef QX_COLD_NOINLINE
 #if defined(__GNUC__) || defined(__clang__)
 #define QX_COLD_NOINLINE __attribute__((cold, noinline))
 #elif defined(_MSC_VER)
@@ -89,8 +105,10 @@
 #else
 #define QX_COLD_NOINLINE
 #endif
+#endif
 
 // __builtin_trap is a GCC + Clang builtin
+#ifndef QX_TRAP
 #if __has_builtin(__builtin_trap) || defined(__GNUC__)
 #define QX_TRAP() __builtin_trap()
 #elif defined(_MSC_VER)
@@ -100,24 +118,29 @@
 #else
 #define QX_TRAP() std::abort()
 #endif
+#endif
 
 // __builtin_verbose_trap is Clang-only.
 // AppleClang < 17 shipped a 1-arg version; upstream Clang 18+ is 2-arg.
+#ifndef QX_TRAP_WITH_MSG
 #if defined(__clang__) && __has_builtin(__builtin_verbose_trap)
 #if defined(__apple_build_version__) && __apple_build_version__ < 17000000
-#define QX_TRAP_WITH_MSG(tag, msg) __builtin_verbose_trap(msg)
+#define QX_TRAP_WITH_MSG(tag, msg) __builtin_verbose_trap(tag ": " msg)
 #else
 #define QX_TRAP_WITH_MSG(tag, msg) __builtin_verbose_trap(tag, msg)
 #endif
 #else
 #define QX_TRAP_WITH_MSG(tag, msg) QX_TRAP()
 #endif
+#endif
 
 // char8_t
+#ifndef QX_HAS_CHAR8_T
 #if defined(__cpp_char8_t) && __cpp_char8_t >= 201811L
 #define QX_HAS_CHAR8_T 1
 #else
 #define QX_HAS_CHAR8_T 0
+#endif
 #endif
 
 namespace qx
@@ -137,18 +160,6 @@ struct remove_cvref : std::remove_cv<std::remove_reference_t<T>>
 {};
 template <class T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
-#endif // __cplusplus >= 202002L
-
-// std::type_identity (C++20)
-
-#if __cplusplus >= 202002L
-using std::type_identity;
-using std::type_identity_t;
-#else
-template<class T>
-struct type_identity { using type = T; };
-template <class T>
-using type_identity_t = typename type_identity<T>::type;
 #endif // __cplusplus >= 202002L
 
 // std::is_constant_evaluated() (C++20)
