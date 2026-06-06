@@ -182,6 +182,7 @@ inline QX_COLD_NOINLINE void v_contract_fail_handler(char const* msg)
     std::fflush(stderr);
 }
 
+#ifndef QX_CONTRACT_FAIL_HANDLER
 #if QX_ASSERT_MODE == QX_ASSERT_MODE_NONE
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) ((void)0)
 #elif QX_ASSERT_MODE == QX_ASSERT_MODE_TRAP
@@ -197,13 +198,16 @@ inline QX_COLD_NOINLINE void v_contract_fail_handler(char const* msg)
 #else
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) ((void)0)
 #endif
+#endif
 
+#ifndef QX_ASSERT_CONTRACT
 #if (QX_HARDENING_MODE > QX_HARDENING_MODE_NONE) && (QX_ASSERT_MODE > QX_ASSERT_MODE_NONE)
 #define QX_ASSERT_CONTRACT(cond, msg)                                                                                                      \
     (QX_LIKELY(cond) ? ((void)0)                                                                                                           \
                      : QX_CONTRACT_FAIL_HANDLER("qxlib", __FILE__ ":" QX_STRINGIFY(__LINE__), "contract violation '" #cond "': " msg))
 #else
 #define QX_ASSERT_CONTRACT(cond, msg) ((void)0)
+#endif
 #endif
 
 // min_size_t: obtain the minimal size-like type that fits a given capacity
