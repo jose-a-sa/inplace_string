@@ -692,20 +692,17 @@ public:
     void resize(size_type n) { resize(n, value_type{}); }
 
     template <class Operation>
-    void resize_and_overwrite(size_type n, Operation op) // since C++23
+    void resize_and_overwrite(size_type n, Operation op)
     {
-        size_type const sz = size();
-        if (n > sz)
-        {
-            QX_ASSERT_CONTRACT(capacity() >= n, "inplace_string::resize_and_overwrite(n, op): n exceeds capacity");
-            set_size_and_null_terminate(n);
-        }
-        else
-        {
-            erase_to_end(n);
-        }
+        using result_type = decltype(std::move(op)(data(), static_cast<size_type>(n)));
+        static_assert(std::is_integral_v<result_type>, "Operation return type must be integer-like");
+        if (n > capacity())
+            intl::throw_length_error("basic_inplace_string");
+
+        // TODO(jose): figure out if we need to fill with null terminator
+        set_size_and_null_terminate(n);
         erase_to_end(std::move(op)(data(), static_cast<size_type>(n)));
-    };
+    }
 
     // ReSharper disable once CppMemberFunctionMayBeConst
     void reserve(size_type n)
@@ -1873,13 +1870,14 @@ public:
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find_first_not_of(ptr, pos, n) detected nullptr");
         const_pointer const ptr = data();
         size_type const sz = size();
-        if (pos >= sz || n == 0)
-            return npos;
-        const_pointer pe = ptr + sz;
-        for (const_pointer ps = ptr + pos; ps != pe; ++ps)
+        if (pos < sz)
         {
-            if (traits_type::find(str, n, *ps) == nullptr)
-                return static_cast<size_type>(ps - ptr);
+            const_pointer const end = ptr + sz;
+            for (const_pointer start = ptr + pos; start != end; ++start)
+            {
+                if (traits_type::find(str, n, *start) == nullptr)
+                    return static_cast<size_type>(start - ptr);
+            }
         }
         return npos;
     }
@@ -1903,7 +1901,7 @@ public:
                     return static_cast<size_type>(ps - ptr);
             }
         }
-        return pos;
+        return npos;
     }
 
     // find_last_not_of
@@ -1959,7 +1957,7 @@ public:
             if (!traits_type::eq(*--ps, c))
                 return static_cast<size_type>(ps - ptr);
         }
-        return pos;
+        return npos;
     }
 
     // compare
