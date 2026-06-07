@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -34,7 +33,7 @@
 #endif
 
 #ifndef QX_ASSERT_MODE
-#define QX_ASSERT_MODE QX_ASSERT_MODE_LOG_TRAP
+#define QX_ASSERT_MODE QX_ASSERT_MODE_LOG_TRAP // default assertion mode
 #else
 #if (QX_ASSERT_MODE > QX_ASSERT_MODE_LOG_ABORT)
 #undef QX_ASSERT_MODE
@@ -2493,13 +2492,6 @@ inline void swap(basic_inplace_string<N, CharT, Traits>& lhs, basic_inplace_stri
 // long double stold(string const& __str, size_t* __idx = nullptr);
 
 // Constexpr-friendly integer log10 ceil (replaces the broken recursive lambda)
-
-constexpr std::size_t round_to_word_size(std::size_t required_n)
-{
-    constexpr std::size_t kWordSize = 8;
-    // total struct size is N+2, round that up, then back out the 2
-    return (((required_n + 2 + kWordSize - 1) / kWordSize) * kWordSize) - 2;
-}
 
 template <std::size_t N, class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 inplace_string<N> unchecked_to_inplace_string(T val) noexcept
