@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -220,6 +221,17 @@ using min_size_t =
     std::conditional_t<(N <= std::numeric_limits<std::uint_least64_t>::max()), std::uint_least64_t, 
     std::size_t>>>>;
 // clang-format on
+
+// ceil_log10 helper
+
+template <std::size_t N>
+struct ceil_log10
+{
+    static constexpr int value = (N < 10) ? 1 : 1 + ceil_log10<N / 10>::value;
+};
+template <>
+struct ceil_log10<0> : std::integral_constant<int, 0>
+{};
 
 // iterator_value
 
@@ -2480,6 +2492,15 @@ inline void swap(basic_inplace_string<N, CharT, Traits>& lhs, basic_inplace_stri
 // double stod(string const& __str, size_t* __idx = nullptr);
 // long double stold(string const& __str, size_t* __idx = nullptr);
 
+// Constexpr-friendly integer log10 ceil (replaces the broken recursive lambda)
+
+constexpr std::size_t round_to_word_size(std::size_t required_n)
+{
+    constexpr std::size_t kWordSize = 8;
+    // total struct size is N+2, round that up, then back out the 2
+    return (((required_n + 2 + kWordSize - 1) / kWordSize) * kWordSize) - 2;
+}
+
 template <std::size_t N, class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 inplace_string<N> unchecked_to_inplace_string(T val) noexcept
 {
@@ -2499,7 +2520,7 @@ std::optional<inplace_string<N>> try_to_inplace_string(T val) noexcept
     auto const [end, ec] = std::to_chars(begin, begin + N, val);
     if (ec != std::errc())
         return std::nullopt;
-    res.set_size_and_null_terminate(end - begin);
+    res.set_size_and_null_terminate(static_cast<std::size_t>(end - begin)); // fix: added cast
     return res;
 }
 
@@ -2508,11 +2529,33 @@ inplace_string<N> to_inplace_string(T val)
 {
     inplace_string<N> res;
     auto const begin = res.data();
-    auto [end, ec] = std::to_chars(begin, begin + N, val);
+    auto const [end, ec] = std::to_chars(begin, begin + N, val); // fix: const
     if (ec != std::errc())
         intl::throw_length_error("to_inplace_string");
-    res.set_size_and_null_terminate(end - begin);
+    res.set_size_and_null_terminate(static_cast<std::size_t>(end - begin));
     return res;
+}
+
+template <class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+auto to_inplace_string(T val) noexcept
+{
+    static constexpr std::size_t kRequiredN =
+        std::is_integral_v<T>
+            ? 2 + std::numeric_limits<T>::digits10 // integral types
+            : 4 + std::numeric_limits<T>::max_digits10 + std::max(2, intl::ceil_log10<std::numeric_limits<T>::max_exponent10>::value);
+
+    static constexpr std::size_t kWordSize = sizeof(std::size_t);
+    static constexpr std::size_t kCharSize = sizeof(char);
+
+    using SizeT = intl::min_size_t<kRequiredN>;
+    static constexpr std::size_t kSizeSize = std::max(alignof(SizeT), kCharSize);
+
+    static constexpr std::size_t kStorageAlign = std::max(kWordSize, kSizeSize);
+    static constexpr std::size_t kStorageRawSize = kSizeSize + ((kRequiredN + 1) * kCharSize);
+    static constexpr std::size_t kStorageSize = (kStorageRawSize + kStorageAlign - 1) & ~(kStorageAlign - 1);
+
+    static constexpr std::size_t kOptimalN = ((kStorageSize - kSizeSize) / kCharSize) - 1;
+    return unchecked_to_inplace_string<kOptimalN>(val);
 }
 
 } // namespace qx
