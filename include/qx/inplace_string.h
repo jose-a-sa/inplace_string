@@ -229,7 +229,7 @@ struct ceil_log10
     static constexpr int value = (N < 10) ? 1 : 1 + ceil_log10<N / 10>::value;
 };
 template <>
-struct ceil_log10<0> : std::integral_constant<int, 0>
+struct ceil_log10<0> : std::integral_constant<int, 1>
 {};
 
 // iterator_value
@@ -600,13 +600,13 @@ public:
 
     basic_inplace_string(CharT const* str) // NOLINT(*-explicit-constructor, *-explicit-conversions)
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "basic_inplace_string(CharT const*) detected nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string(ptr) detected nullptr");
         init(str, traits_type::length(str));
     }
 
     basic_inplace_string(CharT const* str, size_type n)
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "basic_inplace_string(CharT const*, n) detected nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string(char const*, n) detected nullptr");
         init(str, n);
     }
 
@@ -723,13 +723,13 @@ public:
 
     const_reference operator[](size_type pos) const noexcept
     {
-        QX_ASSERT_CONTRACT(pos < size(), "inplace_string(const char*, n): detected nullptr");
+        QX_ASSERT_CONTRACT(pos < size(), "inplace_string::operator[](pos) detected nullptr");
         return rep_.data[pos];
     }
 
     reference operator[](size_type pos) noexcept
     {
-        QX_ASSERT_CONTRACT(pos < size(), "inplace_string(const char*, n): detected nullptr");
+        QX_ASSERT_CONTRACT(pos < size(), "inplace_string::operator[](pos) detected nullptr");
         return rep_.data[pos];
     }
 
@@ -794,7 +794,7 @@ public:
 
     basic_inplace_string& append(CharT const* str, size_type n)
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::append received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::append(ptr, n) detected nullptr");
 
         size_type const sz = size();
         if (n > capacity() - sz)
@@ -811,7 +811,7 @@ public:
 
     basic_inplace_string& append(CharT const* str)
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::append(CharT const*): received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::append(ptr) detected nullptr");
         return append(str, traits_type::length(str));
     }
 
@@ -884,7 +884,7 @@ public:
 
     basic_inplace_string& unchecked_append(CharT const* str, size_type n) noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::unchecked_append received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::unchecked_append(ptr, n) detected nullptr");
         if (n > 0)
         {
             size_type const sz = size();
@@ -897,7 +897,7 @@ public:
 
     basic_inplace_string& unchecked_append(CharT const* str) noexcept
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::unchecked_append(CharT const*): received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::unchecked_append(ptr) detected nullptr");
         return unchecked_append(str, traits_type::length(str));
     }
 
@@ -952,7 +952,7 @@ public:
 
     basic_inplace_string* try_append(CharT const* str, size_type n) noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::try_append received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::try_append(ptr, n) detected nullptr");
         size_type const sz = size();
         if (n > capacity() - sz)
             return nullptr;
@@ -968,7 +968,7 @@ public:
 
     basic_inplace_string* try_append(CharT const* str) noexcept
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::try_append received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::try_append(ptr, n) detected nullptr");
         return try_append(str, traits_type::length(str));
     }
 
@@ -1006,7 +1006,7 @@ public:
 
     void pop_back()
     {
-        QX_ASSERT_CONTRACT(!empty(), "inplace_string::pop_back() called on empty string");
+        QX_ASSERT_CONTRACT(!empty(), "inplace_string::pop_back(): called on empty string");
         set_size_and_null_terminate(size() - 1);
     }
 
@@ -1062,7 +1062,7 @@ public:
 
     basic_inplace_string& assign(CharT const* str, size_type n)
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::assign received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::assign(ptr, n) detected nullptr");
         if (n > capacity())
             intl::throw_length_error("basic_inplace_string");
         traits_type::move(data(), str, n);
@@ -1072,7 +1072,7 @@ public:
 
     basic_inplace_string& assign(CharT const* str)
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::assign received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::assign(ptr) detected nullptr");
         return assign(str, traits_type::length(str));
     }
 
@@ -1090,8 +1090,7 @@ public:
     {
         if constexpr (intl::has_iter_category_v<Iterator, std::forward_iterator_tag> && intl::is_trivial_contiguous_iterator_v<Iterator>)
         {
-            auto const n = static_cast<size_type>(std::distance(first, last));
-            assign_trivial(std::move(first), std::move(last), n);
+            assign_trivial(std::move(first), std::move(last));
         }
         else
         {
@@ -1131,7 +1130,7 @@ public:
 
     basic_inplace_string& unchecked_assign(CharT const* str, size_type n) noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::unchecked_assign received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::unchecked_assign(ptr, n) detected nullptr");
         traits_type::move(data(), str, n);
         set_size_and_null_terminate(n);
         return *this;
@@ -1139,7 +1138,7 @@ public:
 
     basic_inplace_string& unchecked_assign(CharT const* str) noexcept
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::unchecked_assign received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::unchecked_assign(ptr) detected nullptr");
         return unchecked_assign(str, traits_type::length(str));
     }
 
@@ -1189,7 +1188,7 @@ public:
 
     basic_inplace_string* try_assign(CharT const* str, size_type n) noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::try_assign received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::try_assign(ptr, n) detected nullptr");
         if (n > capacity())
             return nullptr;
         traits_type::move(data(), str, n);
@@ -1199,7 +1198,7 @@ public:
 
     basic_inplace_string* try_assign(CharT const* str) noexcept
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::try_assign received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::try_assign(ptr) detected nullptr");
         return try_assign(str, traits_type::length(str));
     }
 
@@ -1251,7 +1250,7 @@ public:
 
     basic_inplace_string& insert(size_type pos, CharT const* str, size_type n)
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::insert received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::insert(pos, ptr, n) detected nullptr");
         size_type sz = size();
 
         if (pos > sz)
@@ -1278,7 +1277,7 @@ public:
 
     basic_inplace_string& insert(size_type pos, CharT const* str) // constexpr since C++20
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "string::insert received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "string::insert(pos, ptr) detected nullptr");
         return insert(pos, str, traits_type::length(str));
     }
 
@@ -1396,7 +1395,7 @@ public:
 
     basic_inplace_string* try_insert(size_type pos, CharT const* str, size_type n) noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::insert received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::try_insert(pos, ptr, n) detected nullptr");
         size_type sz = size();
         if (pos > sz)
             return nullptr;
@@ -1423,7 +1422,7 @@ public:
 
     basic_inplace_string* try_insert(size_type pos, CharT const* str) noexcept // constexpr since C++20
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "string::insert received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "string::try_insert(pos, str) detected nullptr");
         return try_insert(pos, str, traits_type::length(str));
     }
 
@@ -1536,7 +1535,7 @@ public:
 
     basic_inplace_string& replace(size_type pos, size_type n1, CharT const* str, size_type n2)
     {
-        QX_ASSERT_CONTRACT(n2 == 0 || str != nullptr, "inplace_string::replace(pos, n1, char const*, n2) received nullptr");
+        QX_ASSERT_CONTRACT(n2 == 0 || str != nullptr, "inplace_string::replace(pos, n1, ptr, n2) detected nullptr");
 
         size_type const sz = size();
         if (pos > sz)
@@ -1578,7 +1577,7 @@ public:
 
     basic_inplace_string& replace(size_type pos, size_type n1, CharT const* str)
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::replace received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::replace(pos, n1, ptr) detected nullptr");
         return replace(pos, n1, str, traits_type::length(str));
     }
 
@@ -1689,7 +1688,7 @@ public:
 
     size_type find(CharT const* str, size_type pos, size_type n) const noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find(): received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find(ptr, pos, n) detected nullptr");
 
         const_pointer const ptr = data();
         size_type const sz = size();
@@ -1707,7 +1706,7 @@ public:
 
     size_type find(CharT const* str, size_type pos = 0) const noexcept
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find(): received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find(ptr, pos) detected nullptr");
         return find(str, pos, traits_type::length(str));
     }
 
@@ -1738,7 +1737,7 @@ public:
 
     size_type rfind(CharT const* str, size_type pos, size_type n) const noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::rfind(): received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::rfind(ptr, pos, n) detected nullptr");
 
         const_pointer const ptr = data();
         size_type const sz = size();
@@ -1794,7 +1793,7 @@ public:
 
     size_type find_first_of(CharT const* str, size_type pos, size_type n) const noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find_first_of(): received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find_first_of(ptr, pos, n) detected nullptr");
         const_pointer const ptr = data();
         size_type const sz = size();
         if (pos >= sz || n == 0)
@@ -1828,7 +1827,7 @@ public:
 
     size_type find_last_of(CharT const* str, size_type pos, size_type n) const noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find_last_of(): received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find_last_of(ptr, pos, n) detected nullptr");
         if (n != 0)
         {
             const_pointer const ptr = data();
@@ -1871,7 +1870,7 @@ public:
 
     size_type find_first_not_of(CharT const* str, size_type pos, size_type n) const noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find_first_not_of(): received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find_first_not_of(ptr, pos, n) detected nullptr");
         const_pointer const ptr = data();
         size_type const sz = size();
         if (pos >= sz || n == 0)
@@ -1887,7 +1886,7 @@ public:
 
     size_type find_first_not_of(CharT const* str, size_type pos = 0) const noexcept
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find_first_not_of(): received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find_first_not_of(ptr, pos, n) detected nullptr");
         return find_first_not_of(str, pos, traits_type::length(str));
     }
 
@@ -1923,7 +1922,7 @@ public:
 
     size_type find_last_not_of(CharT const* str, size_type pos, size_type n) const noexcept
     {
-        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find_last_not_of(): received nullptr");
+        QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::find_last_not_of(ptr, pos, n) detected nullptr");
         const_pointer const ptr = data();
         size_type const sz = size();
         pos = std::min(pos, sz);
@@ -1942,7 +1941,7 @@ public:
 
     size_type find_last_not_of(CharT const* str, size_type pos = npos) const noexcept
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find_last_not_of(): received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::find_last_not_of(ptr, pos, n) detected nullptr");
         return find_last_not_of(str, pos, traits_type::length(str));
     }
 
@@ -2006,19 +2005,19 @@ public:
 
     int compare(CharT const* str) const noexcept
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::compare(): received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::compare(ptr) detected nullptr");
         return compare(0, npos, str, traits_type::length(str));
     }
 
     int compare(size_type pos1, size_type n1, CharT const* str) const
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::compare(): received nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string::compare(pos1, n1, ptr) detected nullptr");
         return compare(pos1, n1, str, traits_type::length(str));
     }
 
     int compare(size_type pos1, size_type n1, CharT const* str, size_type n2) const
     {
-        QX_ASSERT_CONTRACT(n2 == 0 || str != nullptr, "inplace_string::compare(): received nullptr");
+        QX_ASSERT_CONTRACT(n2 == 0 || str != nullptr, "inplace_string::compare(pos1, n1, ptr, n2) detected nullptr");
         size_type const sz = size();
 
         if (pos1 > sz || n2 == npos)
@@ -2095,11 +2094,13 @@ private:
     // inplace_string representation
     inplace_string_storage<compressed_size_type, CharT, N> rep_{};
 
-    void set_size_and_null_terminate(size_type size) noexcept
+    void set_size_and_null_terminate(size_type n) noexcept
     {
-        QX_ASSERT_CONTRACT(size <= std::numeric_limits<compressed_size_type>::max(), "set_size_and_null_terminate size overflow");
-        rep_.size = static_cast<compressed_size_type>(size);
-        traits_type::assign(rep_.data[size], value_type{});
+        QX_ASSERT_CONTRACT(
+            n <= std::numeric_limits<compressed_size_type>::max(), "inplace_string::set_size_and_null_terminate(n) size overflow"
+        );
+        rep_.size = static_cast<compressed_size_type>(n);
+        traits_type::assign(rep_.data[n], value_type{});
     }
 
     void init(value_type const* str, size_type n)
@@ -2141,12 +2142,14 @@ private:
     }
 
     template <class Iterator, class Sentinel>
-    void assign_trivial(Iterator first, Sentinel /*last*/, size_type n)
+    void assign_trivial(Iterator first, Sentinel last)
     {
-        QX_ASSERT_CONTRACT(intl::is_trivial_contiguous_iterator_v<Iterator>, "The iterator type given to `assign_trivial` must be trivial");
-        QX_ASSERT_CONTRACT(n <= capacity(), "assign_trivial(Iterator, Sentinel, size_type) was called with not enough capacity");
+        QX_ASSERT_CONTRACT(intl::is_trivial_contiguous_iterator_v<Iterator>, "inplace_string::assign_trivial(first, last): the iterator type must be trivial");
 
-        const_pointer const src = intl::to_address(std::move(first));
+        auto const n = static_cast<size_type>(std::distance(first, last));
+        QX_ASSERT_CONTRACT(n <= capacity(), "inplace_string::assign_trivial(first, last) was called with not enough capacity");
+
+        const_pointer const src = intl::to_address(first);
         pointer const ptr = data();
 
         if (intl::is_overlapping_range(ptr, ptr + n, src))
@@ -2242,19 +2245,19 @@ private:
     }
 
     template <class Iterator, class Sentinel>
-    static value_type* copy_non_overlapping_range(Iterator first, Sentinel last, value_type* dest)
+    static pointer copy_non_overlapping_range(Iterator first, Sentinel last, pointer dest)
     {
         if constexpr (intl::is_contiguous_iterator_v<Iterator> && std::is_same_v<value_type, intl::iter_value_t<Iterator>> &&
                       std::is_same_v<Iterator, Sentinel>)
         {
-            auto const unwrapped_first = intl::to_address(std::move(first));
-            auto const unwrapped_last = intl::to_address(std::move(last));
+            auto const first_addr = intl::to_address(std::move(first));
+            auto const last_addr = intl::to_address(std::move(last));
             QX_ASSERT_CONTRACT(
-                !intl::is_overlapping_range(unwrapped_first, unwrapped_last, dest),
-                "copy_non_overlapping_range called with an overlapping range!"
+                !intl::is_overlapping_range(first_addr, last_addr, dest),
+                "inplace_string::copy_non_overlapping_range(first, last, dest) called with an overlapping range!"
             );
-            auto const n_copy = unwrapped_last - unwrapped_first;
-            traits_type::copy(dest, unwrapped_first, n_copy);
+            auto const n_copy = last_addr - first_addr;
+            traits_type::copy(dest, first_addr, n_copy);
             return dest + n_copy;
         }
 
@@ -2313,7 +2316,7 @@ inline bool operator==(basic_inplace_string<N, CharT, Traits> const& lhs, basic_
 template <std::size_t N, class CharT, class Traits>
 inline bool operator==(basic_inplace_string<N, CharT, Traits> const& lhs, CharT const* rhs) noexcept
 {
-    QX_ASSERT_CONTRACT(rhs != nullptr, "operator==(basic_inplace_string, CharT*): received nullptr");
+    QX_ASSERT_CONTRACT(rhs != nullptr, "inplace_string::operator==(inplace_string, char*) detected nullptr");
 
     std::size_t const rhs_len = Traits::length(rhs);
     if (rhs_len != lhs.size())
@@ -2499,7 +2502,7 @@ inplace_string<N> unchecked_to_inplace_string(T val) noexcept
     inplace_string<N> res;
     auto const begin = res.data();
     auto const [end, ec] = std::to_chars(begin, begin + N, val);
-    QX_ASSERT_CONTRACT(ec == std::errc{}, "unchecked_to_inplace_string: value exceeds buffer capacity");
+    QX_ASSERT_CONTRACT(ec == std::errc{}, "unchecked_to_inplace_string(val): value exceeds buffer capacity");
     res.set_size_and_null_terminate(static_cast<std::size_t>(end - begin));
     return res;
 }
@@ -2536,17 +2539,14 @@ auto to_inplace_string(T val) noexcept
             ? 2 + std::numeric_limits<T>::digits10 // integral types
             : 4 + std::numeric_limits<T>::max_digits10 + std::max(2, intl::ceil_log10<std::numeric_limits<T>::max_exponent10>::value);
 
-    static constexpr std::size_t kWordSize = sizeof(std::size_t);
-    static constexpr std::size_t kCharSize = sizeof(char);
-
     using SizeT = intl::min_size_t<kRequiredN>;
-    static constexpr std::size_t kSizeSize = std::max(alignof(SizeT), kCharSize);
+    static constexpr std::size_t kSizeSize = std::max(sizeof(SizeT), sizeof(char));
 
-    static constexpr std::size_t kStorageAlign = std::max(kWordSize, kSizeSize);
-    static constexpr std::size_t kStorageRawSize = kSizeSize + ((kRequiredN + 1) * kCharSize);
+    static constexpr std::size_t kStorageAlign = std::max(sizeof(std::size_t), kSizeSize);
+    static constexpr std::size_t kStorageRawSize = kSizeSize + ((kRequiredN + 1) * sizeof(char));
     static constexpr std::size_t kStorageSize = (kStorageRawSize + kStorageAlign - 1) & ~(kStorageAlign - 1);
 
-    static constexpr std::size_t kOptimalN = ((kStorageSize - kSizeSize) / kCharSize) - 1;
+    static constexpr std::size_t kOptimalN = ((kStorageSize - kSizeSize) / sizeof(char)) - 1;
     return unchecked_to_inplace_string<kOptimalN>(val);
 }
 

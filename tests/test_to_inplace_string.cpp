@@ -8,17 +8,6 @@
 #include <string_view>
 
 #include <qx/inplace_string.h>
-#include <type_traits>
-
-#ifndef M_PI
-#define M_PI 3.141592653589793238462643383279502884
-#endif
-#ifndef M_E
-#define M_E 2.718281828459045235360287471352662498
-#endif
-#ifndef M_SQRT2
-#define M_SQRT2 1.414213562373095048801688724209698079
-#endif
 
 namespace
 {
@@ -48,13 +37,13 @@ TEST(InplaceString, ToInplaceStringSized)
 
 TEST(InplaceString, TryToInplaceString)
 {
-    EXPECT_FALSE((qx::try_to_inplace_string<2, int>(255).has_value()));
-    EXPECT_FALSE((qx::try_to_inplace_string<2, uint8_t>(255).has_value()));
-    EXPECT_FALSE((qx::try_to_inplace_string<2>(255).has_value()));
+    EXPECT_FALSE((qx::try_to_inplace_string<2, int>(255)));
+    EXPECT_FALSE((qx::try_to_inplace_string<2, uint8_t>(255)));
+    EXPECT_FALSE((qx::try_to_inplace_string<2>(255)));
 
-    EXPECT_TRUE((qx::try_to_inplace_string<3, int>(255).has_value()));
-    EXPECT_TRUE((qx::try_to_inplace_string<3, uint8_t>(255).has_value()));
-    EXPECT_TRUE((qx::try_to_inplace_string<3>(255).has_value()));
+    EXPECT_TRUE((qx::try_to_inplace_string<3, int>(255)));
+    EXPECT_TRUE((qx::try_to_inplace_string<3, uint8_t>(255)));
+    EXPECT_TRUE((qx::try_to_inplace_string<3>(255)));
 }
 
 TEST(InplaceString, ToInplaceString)
