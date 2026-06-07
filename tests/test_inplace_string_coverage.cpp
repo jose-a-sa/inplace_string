@@ -1,48 +1,7 @@
-/**
- * test_inplace_string_coverage.cpp
- *
- * Targets coverage gaps not exercised by the existing test files:
- *   - unchecked_append / unchecked_assign / unchecked_to_inplace_string
- *   - try_append / try_assign / try_to_inplace_string (edge paths)
- *   - try_insert / try_insert with overflow / out-of-range
- *   - operator+= (char, string_view, c-string overloads)
- *   - operator= for char and zero-capacity guard
- *   - push_back at capacity (throws)
- *   - replace iterator-pair overloads & initializer_list overload
- *   - replace with same-size / shrink / grow paths
- *   - insert(const_iterator, char) and insert(const_iterator, n, char)
- *   - insert(const_iterator, initializer_list)
- *   - rfind(string), rfind(string, pos), rfind(c-string, pos, n)
- *   - find(string), find(c-string, pos, n), find(char, out-of-range)
- *   - find_first_of / find_last_of char overloads
- *   - find_first_not_of(char) edge cases, find_last_not_of(char) & n==0 path
- *   - compare(pos1, n1, inplace_string, pos2, n2) and string_view overload
- *   - compare pos1 > sz throws, n2==npos throws
- *   - operator< / > / <= / >= with c-string on both sides
- *   - global qx::swap
- *   - resize(n) default-char fill
- *   - resize_and_overwrite
- *   - length() (alias for size())
- *   - inplace_wstring / deduction guide
- *   - different-N equality (operator==, operator!=)
- *   - append(string_view-like, pos, n)
- *   - assign(string_view-like, pos, n) & out-of-range
- *   - insert(pos, inplace_string) and insert(pos, inplace_string, pos2, n2)
- *   - insert(pos, string_view-like)
- *   - replace(pos, n, inplace_string, pos2, n2)
- *   - replace(iterator, iterator, ...) variants
- *   - substr() return type is inplace_string (copy)
- *   - data() non-const
- *   - find_last_not_of with pos < sz branch
- *   - find_first_not_of n==0 returns npos
- */
-
-#include "string_api_tester.h"
 #include <qx/inplace_string.h>
 
 #include <gtest/gtest.h>
 
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
