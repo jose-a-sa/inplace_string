@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <gmock/gmock.h>
 
 #include <cstdint>
@@ -7,6 +8,7 @@
 #include <string_view>
 
 #include <qx/inplace_string.h>
+#include <type_traits>
 
 #ifndef M_PI
 #define M_PI 3.141592653589793238462643383279502884
@@ -26,7 +28,7 @@ void test_to_inplace_str(std::initializer_list<std::pair<T, char const*>> pairs)
 {
     for (auto [val, expected] : pairs)
     {
-        auto const str = qx::to_inplace_string<62>(val);
+        auto const str = qx::to_inplace_string(val);
         auto const exp_sv = std::string_view{expected};
         EXPECT_EQ(str, expected);
         // EXPECT_EQ(str, exp_sv);
