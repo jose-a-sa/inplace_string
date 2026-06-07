@@ -64,16 +64,20 @@ if(QX_BUILD_TESTS)
 
   foreach(_test_file IN LISTS _tests)
     get_filename_component(_test_name "${_test_file}" NAME_WE)
-    add_executable("${_test_name}" "${_test_file}")
-    target_include_directories("${_test_name}" PRIVATE
+    add_executable(${_test_name} "${_test_file}")
+    target_include_directories(${_test_name} PRIVATE
       "${CMAKE_CURRENT_SOURCE_DIR}/tests"
     )
-    target_link_libraries("${_test_name}" PRIVATE
+    target_link_libraries(${_test_name} PRIVATE
       GTest::gmock_main
       # fmt::fmt
       ${PROJECT_NAMESPACE}::inplace_string
     )
-    gtest_discover_tests("${_test_name}")
+    target_compile_definitions(${_test_name} PRIVATE
+      QX_HARDENING_MODE=QX_HARDENING_MODE_ALL
+      QX_ASSERT_MODE=QX_ASSERT_MODE_LOG_TRAP
+    )
+    gtest_discover_tests(${_test_name})
   endforeach()
 
   unset(_tests)

@@ -1,88 +1,125 @@
-#include <qx/inplace_string.h>
+#include <gmock/gmock.h>
 
-#include <gtest/gtest.h>
+#include <qx/inplace_string.h>
 
 #include <list>
 #include <vector>
 
-// 1. Appending another inplace_string
-TEST(InplaceStringAppendTest, AppendInplaceString)
+// ===========================================================================
+// Append (append, try_append, unchecked_append, push_back, operator+=)
+// ===========================================================================
+
+TEST(InplaceStringAppend, BasicAppend)
 {
     qx::inplace_string<15> s("hello ");
     qx::inplace_string<10> s2("world");
-
     s.append(s2);
     EXPECT_STREQ(s.c_str(), "hello world");
 
-    qx::inplace_string<15> s3("!");
-    s3 += s2; // operator+= overload
-    EXPECT_STREQ(s3.c_str(), "!world");
-}
-
-// 2. Appending Substrings (with Out-of-Bounds checks)
-TEST(InplaceStringAppendTest, AppendSubstring)
-{
-    qx::inplace_string<20> s("start-");
+    qx::inplace_string<20> s3("start-");
     qx::inplace_string<10> src("abcdef");
+    s3.append(src, 2, 3);
+    EXPECT_STREQ(s3.c_str(), "start-cde");
 
-    // Append from pos 2, length 3 ("cde")
-    s.append(src, 2, 3);
-    EXPECT_STREQ(s.c_str(), "start-cde");
+    s3.append("");
+    EXPECT_STREQ(s3.c_str(), "start-cde");
 
-    // Append StringLike (string_view) substring
-    std::string_view sv = "xyz";
-    s.append(sv, 1, 1); // Append 'y'
-    EXPECT_STREQ(s.c_str(), "start-cdey");
-
-    // Out of bounds throw
-    EXPECT_THROW(s.append(src, 15, 1), std::out_of_range);
-    EXPECT_THROW(s.append(sv, 5, 1), std::out_of_range);
+    s3.append({'b', 'a', 'r'});
+    EXPECT_STREQ(s3.c_str(), "start-cdebar");
 }
 
-// 3. Appending via Iterators (Hits both branches of the if constexpr)
-TEST(InplaceStringAppendTest, AppendIterators)
+TEST(InplaceStringAppend, AppendIterators)
 {
     qx::inplace_string<20> s1("vec:");
     std::vector<char> vec{'a', 'b', 'c'};
-
-    // Branch 1: Trivial Contiguous Iterator (uses optimized memory copy)
     s1.append(vec.begin(), vec.end());
     EXPECT_STREQ(s1.c_str(), "vec:abc");
 
     qx::inplace_string<20> s2("list:");
     std::list<char> lst{'x', 'y', 'z'};
-
-    // Branch 2: Non-contiguous Iterator (falls back to temporary string copy)
     s2.append(lst.begin(), lst.end());
     EXPECT_STREQ(s2.c_str(), "list:xyz");
 }
 
-// 4. Appending Initializer Lists
-TEST(InplaceStringAppendTest, AppendInitializerList)
+TEST(InplaceStringAppend, UncheckedAppend)
 {
-    qx::inplace_string<10> s("foo");
-    s.append({'b', 'a', 'r'});
-    EXPECT_STREQ(s.c_str(), "foobar");
+    qx::inplace_string<20> s("hello");
+    s.unchecked_append(" world", 6);
+    EXPECT_STREQ(s.c_str(), "hello world");
 
-    qx::inplace_string<10> s2("foo");
-    s2 += {'b', 'a', 'z'};
-    EXPECT_STREQ(s2.c_str(), "foobaz");
+    s.unchecked_append("!");
+    EXPECT_STREQ(s.c_str(), "hello world!");
+
+    s.unchecked_append(3, 'y');
+    EXPECT_STREQ(s.c_str(), "hello world!yyy");
+
+    qx::inplace_string<10> src("abcdef");
+    s.unchecked_append(src, 2, 3);
+    EXPECT_STREQ(s.c_str(), "hello world!yyycde");
 }
 
-// 5. Empty Appends (Short-circuiting)
-TEST(InplaceStringAppendTest, AppendEmpty)
+TEST(InplaceStringAppend, TryAppend)
 {
-    qx::inplace_string<10> s("test");
+    qx::inplace_string<10> s("ab");
+    EXPECT_EQ(s.try_append("cd"), &s);
+    EXPECT_STREQ(s.c_str(), "abcd");
 
-    s.append(""); // Empty C-string
-    EXPECT_EQ(s.size(), 4);
+    EXPECT_EQ(s.try_append("efghijk"), nullptr);
+    EXPECT_STREQ(s.c_str(), "abcd");
 
-    s.append(0, 'x'); // 0 fill characters
-    EXPECT_EQ(s.size(), 4);
+    EXPECT_NE(s.try_append(3, 'x'), nullptr);
+    EXPECT_STREQ(s.c_str(), "abcdxxx");
 
-    std::vector<char> empty_vec;
-    s.append(empty_vec.begin(), empty_vec.end()); // Empty iterator range
-    EXPECT_EQ(s.size(), 4);
+    EXPECT_NE(s.try_append({'y', 'z'}), nullptr);
+    EXPECT_STREQ(s.c_str(), "abcdxxxyz");
+}
 
-    EXPECT_STREQ(s.c_str(), "test");
+TEST(InplaceStringAppend, OperatorPlusEq)
+{
+    qx::inplace_string<10> s("abc");
+    s += 'd';
+    EXPECT_STREQ(s.c_str(), "abcd");
+    s += "ef";
+    EXPECT_STREQ(s.c_str(), "abcdef");
+
+    std::string bar = "g";
+    s += bar;
+    EXPECT_STREQ(s.c_str(), "abcdefg");
+}
+
+TEST(InplaceStringAppend, PushBack)
+{
+    qx::inplace_string<10> s;
+    s.push_back('a');
+    s.push_back('b');
+    EXPECT_STREQ(s.c_str(), "ab");
+
+    qx::inplace_string<5> full("abcde");
+    EXPECT_THROW(full.push_back('f'), std::length_error);
+}
+
+TEST(InplaceStringAppend, SelfOverlapping)
+{
+    qx::inplace_string<20> s("loop");
+    std::string_view sv(s.data(), s.size());
+    s.append(sv);
+    EXPECT_STREQ(s.c_str(), "looploop");
+
+    qx::inplace_string<20> s3("loop");
+    s3.append(s3, 0, 4);
+    EXPECT_STREQ(s3.c_str(), "looploop");
+}
+
+TEST(InplaceStringAppend, ExceptionsAndContracts)
+{
+    qx::inplace_string<5> s("abcd");
+    EXPECT_THROW(s.append("ef"), std::length_error);
+    EXPECT_THROW(s.append(5, 'x'), std::length_error);
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            s.append(null_str);
+        },
+        "contract violation"
+    );
 }
