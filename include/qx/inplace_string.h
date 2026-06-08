@@ -371,18 +371,18 @@ constexpr T* to_address(T* p) noexcept
 
 #if defined(QX_STL_LIBSTDCXX)
 template <class T>
-inline constexpr auto is_fancy_pointer_v = is_gnu_wrapped_iterator_v<T> || has_pointer_traits_to_address_v<T> || has_arrow_operator_v<T>;
+inline constexpr auto is_fancy_pointer_v =
+    std::is_class_v<T> && (is_gnu_wrapped_iterator_v<T> || has_pointer_traits_to_address_v<T> || has_arrow_operator_v<T>);
 #elif defined(QX_STL_MSVC)
 template <class T>
-inline constexpr auto is_fancy_pointer_v = is_msvc_wrapped_iterator_v<T> || has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>;
+inline constexpr auto is_fancy_pointer_v =
+    std::is_class_v<T> && (is_msvc_wrapped_iterator_v<T> || has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>);
 #else
 template <class T>
-inline constexpr auto is_fancy_pointer_v = has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>;
+inline constexpr auto is_fancy_pointer_v = std::is_class_v<T> && (has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>);
 #endif
 
-template <
-    class Ptr,
-    std::enable_if_t<std::is_class_v<std::remove_reference_t<Ptr>> && is_fancy_pointer_v<std::remove_reference_t<Ptr>>, int> = 0>
+template <class Ptr, std::enable_if_t<is_fancy_pointer_v<std::remove_reference_t<Ptr>>, int> = 0>
 constexpr auto to_address(Ptr&& ptr) noexcept -> decltype(auto)
 {
     using pointer = std::remove_reference_t<Ptr>;
@@ -400,10 +400,9 @@ constexpr auto to_address(Ptr&& ptr) noexcept -> decltype(auto)
 
 #endif // __cplusplus >= 202002L
 
-// str_is_trivial_iterator: checks if an iterator is a trivial iterator for the purposes of appending or inserting from it. A trivial
+// is_trivial_contiguous_iterator: checks if an iterator is a trivial iterator for the purposes of appending or inserting from it. A trivial
 // iterator is either a pointer to an arithmetic type, or an iterator that is contiguous and has an arithmetic value type. This allows for
 // optimizations when copying from such iterators, while still being safe in the presence of overlapping ranges.
-
 template <class Iter, class = void>
 struct is_trivial_contiguous_iterator : std::false_type
 {};
@@ -2142,7 +2141,10 @@ private:
     template <class Iterator, class Sentinel>
     void assign_trivial(Iterator first, Sentinel last)
     {
-        QX_ASSERT_CONTRACT(intl::is_trivial_contiguous_iterator_v<Iterator>, "inplace_string::assign_trivial(first, last): the iterator type must be trivial");
+        QX_ASSERT_CONTRACT(
+            intl::is_trivial_contiguous_iterator_v<Iterator>,
+            "inplace_string::assign_trivial(first, last): the iterator type must be trivial"
+        );
 
         auto const n = static_cast<size_type>(std::distance(first, last));
         QX_ASSERT_CONTRACT(n <= capacity(), "inplace_string::assign_trivial(first, last) was called with not enough capacity");
@@ -2290,9 +2292,6 @@ private:
             ++first1;
         }
     }
-
-    template <std::size_t OtherN, class OtherCharT, class OtherTraits>
-    friend class basic_inplace_string;
 
     template <std::size_t M, class T, std::enable_if_t<std::is_arithmetic_v<T>, int>>
     friend inplace_string<M> to_inplace_string(T);
@@ -2549,3 +2548,26 @@ auto to_inplace_string(T val) noexcept
 }
 
 } // namespace qx
+
+namespace std
+{
+
+template <std::size_t N>
+struct hash<qx::basic_inplace_string<N, char, char_traits<char>>> : hash<basic_string_view<char, char_traits<char>>>
+{};
+#if QX_HAS_CHAR8_T
+template <std::size_t N>
+struct hash<qx::basic_inplace_string<N, char8_t, char_traits<char8_t>>> : hash<basic_string_view<char8_t, char_traits<char8_t>>>
+{};
+#endif
+template <std::size_t N>
+struct hash<qx::basic_inplace_string<N, char16_t, char_traits<char16_t>>> : hash<basic_string_view<char16_t, char_traits<char16_t>>>
+{};
+template <std::size_t N>
+struct hash<qx::basic_inplace_string<N, char32_t, char_traits<char32_t>>> : hash<basic_string_view<char32_t, char_traits<char32_t>>>
+{};
+template <std::size_t N>
+struct hash<qx::basic_inplace_string<N, wchar_t, char_traits<wchar_t>>> : hash<basic_string_view<wchar_t, char_traits<wchar_t>>>
+{};
+
+} // namespace std
