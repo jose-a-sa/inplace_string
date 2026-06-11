@@ -2,6 +2,8 @@
 
 #include <qx/inplace_string.h>
 
+#include <string_view>
+
 // ===========================================================================
 // Assignment (assign, try_assign, unchecked_assign, operator=)
 // ===========================================================================
