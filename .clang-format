@@ -1,7 +1,7 @@
 # Generated from CLion C/C++ Code Style settings
 ---
 BasedOnStyle: LLVM
-ColumnLimit: 140
+ColumnLimit: 120
 IndentWidth: 4
 TabWidth: 4
 AccessModifierOffset: -4
@@ -11,10 +11,15 @@ AllowShortFunctionsOnASingleLine: InlineOnly
 PackConstructorInitializers: Never 
 BreakConstructorInitializers: BeforeComma
 
-AlignAfterOpenBracket: BlockIndent
+AlignAfterOpenBracket: DontAlign
 ContinuationIndentWidth: 4
 BinPackArguments: false
 BinPackParameters: false
+
+BreakAfterReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 1000
+
+AlignOperands: DontAlign
 
 # ConstructorInitializerIndentWidth: 4
 # BreakConstructorInitializers: BeforeColon
