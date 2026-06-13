@@ -5,14 +5,20 @@
 #include <array>
 #include <deque>
 #include <list>
+#include <type_traits>
 #include <vector>
 
-static_assert(qx::intl::is_trivial_contiguous_iterator<std::vector<char>::iterator>::value);
-static_assert(!qx::intl::is_trivial_contiguous_iterator<std::deque<char>::iterator>::value);
-static_assert(!qx::intl::is_trivial_contiguous_iterator<std::list<char>::iterator>::value);
-static_assert(qx::intl::is_trivial_contiguous_iterator<std::array<char, 10>::iterator>::value);
-static_assert(qx::intl::is_trivial_contiguous_iterator<std::string::iterator>::value);
-static_assert(qx::intl::is_trivial_contiguous_iterator<std::string_view::iterator>::value);
+static_assert(qx::intl::is_trivial_contiguous_iterator_v<std::vector<char>::iterator>);
+static_assert(!qx::intl::is_trivial_contiguous_iterator_v<std::deque<char>::iterator>);
+static_assert(!qx::intl::is_trivial_contiguous_iterator_v<std::list<char>::iterator>);
+static_assert(qx::intl::is_trivial_contiguous_iterator_v<std::array<char, 10>::iterator>);
+static_assert(qx::intl::is_trivial_contiguous_iterator_v<std::string::iterator>);
+static_assert(qx::intl::is_trivial_contiguous_iterator_v<std::string_view::iterator>);
+
+static_assert(std::is_trivially_copyable_v<qx::inplace_string<30>>);
+static_assert(std::is_trivially_copyable_v<qx::inplace_wstring<30>>);
+static_assert(std::is_trivially_copyable_v<qx::inplace_string<256>>);
+static_assert(std::is_trivially_copyable_v<qx::inplace_wstring<256>>);
 
 // ===========================================================================
 // Constructors & Initialization

@@ -46,6 +46,7 @@ TEST(InplaceString, TryToInplaceString)
     EXPECT_TRUE((qx::try_to_inplace_string<3>(255)));
 }
 
+
 TEST(InplaceString, ToInplaceString)
 {
     test_to_inplace_str<uint8_t>({{0U, "0"}, {42U, "42"}, {123U, "123"}, {255U, "255"}});
