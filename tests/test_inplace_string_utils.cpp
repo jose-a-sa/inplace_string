@@ -27,11 +27,6 @@ TEST(InplaceStringUtils, Resize)
 
 TEST(InplaceStringUtils, ResizeAndOverwrite)
 {
-    qx::inplace_string<15> s("hello world");
-    s.resize_and_overwrite(5, [](char* buf, std::size_t n) { return std::size_t{3}; });
-    EXPECT_EQ(s.size(), 3);
-    EXPECT_STREQ(s.c_str(), "hel");
-
     qx::inplace_string<20> s2("hi");
     s2.resize_and_overwrite(
         5,

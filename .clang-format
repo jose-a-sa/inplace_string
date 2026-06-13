@@ -1,7 +1,7 @@
 # Generated from CLion C/C++ Code Style settings
 ---
 BasedOnStyle: LLVM
-ColumnLimit: 120
+ColumnLimit: 140
 IndentWidth: 4
 TabWidth: 4
 AccessModifierOffset: -4

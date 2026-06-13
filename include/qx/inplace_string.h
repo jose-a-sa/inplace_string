@@ -194,19 +194,15 @@ inline QX_COLD_NOINLINE void v_contract_fail_handler(char const* msg)
 #if QX_ASSERT_MODE == QX_ASSERT_MODE_NONE
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) ((void)0)
 #elif QX_ASSERT_MODE == QX_ASSERT_MODE_TRAP
-#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg)                                                                        \
-    (::qx::intl::is_constant_evaluated() ? QX_TRAP() : QX_TRAP_WITH_MSG(tag, msg))
+#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) (::qx::intl::is_constant_evaluated() ? QX_TRAP() : QX_TRAP_WITH_MSG(tag, msg))
 #elif QX_ASSERT_MODE == QX_ASSERT_MODE_LOG_TRAP
-#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg)                                                                        \
-    (::qx::intl::is_constant_evaluated()                                                                               \
-            ? QX_TRAP()                                                                                                \
-            : (::qx::intl::v_contract_fail_handler(loc ": " msg), QX_TRAP_WITH_MSG(tag, msg)))
+#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg)                                                                                            \
+    (::qx::intl::is_constant_evaluated() ? QX_TRAP() : (::qx::intl::v_contract_fail_handler(loc ": " msg), QX_TRAP_WITH_MSG(tag, msg)))
 #elif QX_ASSERT_MODE == QX_ASSERT_MODE_ABORT
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) (::qx::intl::is_constant_evaluated() ? QX_TRAP() : std::abort())
 #elif QX_ASSERT_MODE == QX_ASSERT_MODE_LOG_ABORT
-#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg)                                                                        \
-    (::qx::intl::is_constant_evaluated() ? QX_TRAP()                                                                   \
-                                         : (::qx::intl::v_contract_fail_handler(loc ": " msg), std::abort()))
+#define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg)                                                                                            \
+    (::qx::intl::is_constant_evaluated() ? QX_TRAP() : (::qx::intl::v_contract_fail_handler(loc ": " msg), std::abort()))
 #else
 #define QX_CONTRACT_FAIL_HANDLER(tag, loc, msg) ((void)0)
 #endif
@@ -214,10 +210,9 @@ inline QX_COLD_NOINLINE void v_contract_fail_handler(char const* msg)
 
 #ifndef QX_ASSERT_CONTRACT
 #if (QX_HARDENING_MODE > QX_HARDENING_MODE_NONE) && (QX_ASSERT_MODE > QX_ASSERT_MODE_NONE)
-#define QX_ASSERT_CONTRACT(cond, msg)                                                                                  \
-    (QX_LIKELY(cond) ? ((void)0)                                                                                       \
-                     : QX_CONTRACT_FAIL_HANDLER(                                                                       \
-                           "qxlib", __FILE__ ":" QX_STRINGIFY(__LINE__), "contract violation '" #cond "': " msg))
+#define QX_ASSERT_CONTRACT(cond, msg)                                                                                                      \
+    (QX_LIKELY(cond) ? ((void)0)                                                                                                           \
+                     : QX_CONTRACT_FAIL_HANDLER("qxlib", __FILE__ ":" QX_STRINGIFY(__LINE__), "contract violation '" #cond "': " msg))
 #else
 #define QX_ASSERT_CONTRACT(cond, msg) ((void)0)
 #endif
@@ -256,14 +251,13 @@ template <class Iter>
 using iter_category_t = typename std::iterator_traits<Iter>::iterator_category;
 
 template <class Iter, class Cat, class = void>
-struct has_iter_category : std::false_type
+struct is_iter_with_category : std::false_type
 {};
 template <class Iter, class Cat>
-struct has_iter_category<Iter, Cat, std::void_t<iter_category_t<Iter>>>
-    : std::is_convertible<iter_category_t<Iter>, Cat>
+struct is_iter_with_category<Iter, Cat, std::void_t<iter_category_t<Iter>>> : std::is_convertible<iter_category_t<Iter>, Cat>
 {};
 template <class Iter, class Cat>
-inline constexpr bool has_iter_category_v = has_iter_category<Iter, Cat>::value;
+inline constexpr bool is_iter_with_category_v = is_iter_with_category<Iter, Cat>::value;
 
 // is_contiguous_iterator
 
@@ -353,8 +347,8 @@ template <class Ptr, class = void>
 struct has_pointer_traits_to_address : std::false_type
 {};
 template <class Ptr>
-struct has_pointer_traits_to_address<Ptr,
-    std::void_t<decltype(std::pointer_traits<Ptr>::to_address(std::declval<Ptr&>()))>> : std::true_type
+struct has_pointer_traits_to_address<Ptr, std::void_t<decltype(std::pointer_traits<Ptr>::to_address(std::declval<Ptr&>()))>>
+    : std::true_type
 {};
 template <class Ptr>
 inline constexpr bool has_pointer_traits_to_address_v = has_pointer_traits_to_address<Ptr>::value;
@@ -385,24 +379,22 @@ constexpr T* to_address(T* p) noexcept
 
 #ifdef QX_STL_LIBSTDCXX
 template <class T>
-inline constexpr auto is_fancy_pointer_v = std::is_class_v<T> &&
-    (is_gnu_wrapped_iterator_v<T> || has_pointer_traits_to_address_v<T> || has_arrow_operator_v<T>);
+inline constexpr auto is_fancy_pointer_v =
+    std::is_class_v<T> && (is_gnu_wrapped_iterator_v<T> || has_pointer_traits_to_address_v<T> || has_arrow_operator_v<T>);
 #elif defined(QX_STL_MSVC)
 template <class T>
-inline constexpr auto is_fancy_pointer_v = std::is_class_v<T> &&
-    (is_msvc_wrapped_iterator_v<T> || has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>);
+inline constexpr auto is_fancy_pointer_v =
+    std::is_class_v<T> && (is_msvc_wrapped_iterator_v<T> || has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>);
 #else
 template <class T>
-inline constexpr auto is_fancy_pointer_v =
-    std::is_class_v<T> && (has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>);
+inline constexpr auto is_fancy_pointer_v = std::is_class_v<T> && (has_arrow_operator_v<T> || has_pointer_traits_to_address_v<T>);
 #endif
 
 template <class Ptr, std::enable_if_t<is_fancy_pointer_v<std::remove_reference_t<Ptr>>, int> = 0>
 constexpr auto to_address(Ptr&& ptr) noexcept -> decltype(auto)
 {
     using pointer = std::remove_reference_t<Ptr>;
-    if constexpr (has_pointer_traits_to_address_v<pointer>) // handlers the LLVM
-                                                            // unwrapping
+    if constexpr (has_pointer_traits_to_address_v<pointer>) // handlers the LLVM  unwrapping
         return std::pointer_traits<pointer>::to_address(std::forward<Ptr>(ptr));
 #ifdef QX_STL_LIBSTDCXX
     if constexpr (is_gnu_wrapped_iterator_v<pointer>)
@@ -416,11 +408,10 @@ constexpr auto to_address(Ptr&& ptr) noexcept -> decltype(auto)
 
 #endif // __cplusplus >= 202002L
 
-// is_trivial_contiguous_iterator: checks if an iterator is a trivial iterator
-// for the purposes of appending or inserting from it. A trivial iterator is
-// either a pointer to an arithmetic type, or an iterator that is contiguous and
-// has an arithmetic value type. This allows for optimizations when copying from
-// such iterators, while still being safe in the presence of overlapping ranges.
+// is_trivial_contiguous_iterator: checks if an iterator is a trivial iterator for the purposes of appending or
+// inserting from it. A trivial iterator is either a pointer to an arithmetic type, or an iterator that is contiguous
+// and has an arithmetic value type. This allows for optimizations when copying from such iterators, while still being
+// safe in the presence of overlapping ranges.
 template <class Iter, class = void>
 struct is_trivial_contiguous_iterator : std::false_type
 {};
@@ -448,19 +439,16 @@ inline constexpr bool is_less_than_comparable_v = is_less_than_comparable<T, U>:
 // convertible_to_string_view
 
 template <class CharT, class Traits, class T>
-struct convertible_to_string_view : std::integral_constant<bool,
-                                        std::is_convertible_v<T const&, std::basic_string_view<CharT, Traits>> &&
-                                            !std::is_convertible_v<T const&, CharT const*>>
+struct convertible_to_string_view
+    : std::integral_constant<bool,
+          std::is_convertible_v<T const&, std::basic_string_view<CharT, Traits>> && !std::is_convertible_v<T const&, CharT const*>>
 {};
 template <class CharT, class Traits, class T>
 inline constexpr bool convertible_to_string_view_v = convertible_to_string_view<CharT, Traits, T>::value;
 
-// is_pointer_in_range: checks if a pointer of type U* points to an address in
-// the range [begin, end) of type T*, even if T and U are different types (e.g.
-// char and unsigned char). This is used to check for overlapping ranges when
-// appending or inserting from iterators that may point into the string's own
-// buffer.
-
+// is_pointer_in_range: checks if a pointer of type U* points to an address in the range [begin, end) of type T*, even
+// if T and U are different types (e.g. char and unsigned char). This is used to check for overlapping ranges when
+// appending or inserting from iterators that may point into the string's own buffer.
 template <class T, class U>
 constexpr bool is_pointer_in_range(T const* begin, T const* end, U const* ptr)
 {
@@ -485,11 +473,9 @@ constexpr bool is_pointer_in_range(T const* begin, T const* end, U const* ptr)
     }
 }
 
-// is_overlapping_range: checks if two ranges [begin, end) of type T* and
-// [begin2, begin2 + (end - begin)) of type U* overlap, even if T and U are
-// different types. This is used to check for overlapping ranges when appending
-// or inserting from iterators that may point into the string's own buffer.
-
+// is_overlapping_range: checks if two ranges [begin, end) of type T* and [begin2, begin2 + (end - begin)) of type U*
+// overlap, even if T and U are different types. This is used to check for overlapping ranges when appending or
+// inserting from iterators that may point into the string's own buffer.
 template <class T, class U>
 constexpr bool is_overlapping_range(T const* begin, T const* end, U const* begin2)
 {
@@ -500,9 +486,6 @@ constexpr bool is_overlapping_range(T const* begin, T const* end, U const* begin
 
 } // namespace intl
 
-/**
- *
- */
 template <std::size_t N, class CharT, class Traits = std::char_traits<CharT>>
 class basic_inplace_string;
 
@@ -526,25 +509,15 @@ using inplace_u32string = basic_inplace_string<N, char32_t>;
 template <class CharT, std::size_t N>
 basic_inplace_string(CharT const (&)[N]) -> basic_inplace_string<N - 1, CharT>; // NOLINT(*-avoid-c-arrays)
 
-/**
- * \brief
- *
- * \tparam N
- * \tparam CharT
- * \tparam Traits
- */
 template <std::size_t N, class CharT, class Traits>
 class basic_inplace_string
 {
     static_assert(!std::is_array_v<CharT>, "Character type of basic_inplace_string must not be an array");
     static_assert(std::is_standard_layout_v<CharT>, "Character type of basic_inplace_string must be standard-layout");
-    static_assert(std::is_trivially_default_constructible_v<CharT>,
-        "Character type of basic_inplace_string must be trivially default "
-        "constructible");
     static_assert(
-        std::is_trivially_copyable_v<CharT>, "Character type of basic_inplace_string must be trivially copyable");
-    static_assert(
-        std::is_same_v<CharT, typename Traits::char_type>, "Traits::char_type must be the same type as CharT");
+        std::is_trivially_default_constructible_v<CharT>, "Character type of basic_inplace_string must be trivially default constructible");
+    static_assert(std::is_trivially_copyable_v<CharT>, "Character type of basic_inplace_string must be trivially copyable");
+    static_assert(std::is_same_v<CharT, typename Traits::char_type>, "Traits::char_type must be the same type as CharT");
 
     using self = basic_inplace_string;
     using self_view = std::basic_string_view<CharT, Traits>;
@@ -632,8 +605,7 @@ public:
         init(n, c);
     }
 
-    template <class InputIterator,
-        std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string(InputIterator begin, InputIterator end)
         : basic_inplace_string()
     {
@@ -746,12 +718,12 @@ public:
 
     constexpr const_reference operator[](size_type pos) const noexcept
     {
-        QX_ASSERT_CONTRACT(pos < size(), "inplace_string::operator[](pos) detected nullptr");
+        QX_ASSERT_CONTRACT(pos < size(), "inplace_string::operator[](pos): pos out of bounds");
         return rep_.data[pos];
     }
     constexpr reference operator[](size_type pos) noexcept
     {
-        QX_ASSERT_CONTRACT(pos < size(), "inplace_string::operator[](pos) detected nullptr");
+        QX_ASSERT_CONTRACT(pos < size(), "inplace_string::operator[](pos): pos out of bounds");
         return rep_.data[pos];
     }
 
@@ -786,10 +758,7 @@ public:
 
     basic_inplace_string& operator+=(std::initializer_list<CharT> il) { return append(il.begin(), il.end()); }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& append(basic_inplace_string const& str)
-    {
-        return append(str.data(), str.size());
-    }
+    QX_CONSTEXPR_CXX20 basic_inplace_string& append(basic_inplace_string const& str) { return append(str.data(), str.size()); }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string& append(StringLike const& str)
@@ -852,11 +821,10 @@ public:
         return *this;
     }
 
-    template <class InputIterator,
-        std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string& append(InputIterator first, InputIterator last)
     {
-        if constexpr (intl::has_iter_category_v<InputIterator, std::forward_iterator_tag>)
+        if constexpr (intl::is_iter_with_category_v<InputIterator, std::forward_iterator_tag>)
         {
             size_type const sz = size();
             auto const n = static_cast<size_type>(std::distance(first, last));
@@ -878,10 +846,7 @@ public:
         return *this;
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& append(std::initializer_list<CharT> il)
-    {
-        return append(il.begin(), il.size());
-    }
+    QX_CONSTEXPR_CXX20 basic_inplace_string& append(std::initializer_list<CharT> il) { return append(il.begin(), il.size()); }
 
     // template <ContainerCompatibleRange<CharT> R>
     // constexpr basic_inplace_string& append_range(R&& rg); // C++23
@@ -900,15 +865,13 @@ public:
         return unchecked_append(str_view.data(), str_view.size());
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(
-        basic_inplace_string const& str, size_type pos, size_type n = npos) noexcept
+    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(basic_inplace_string const& str, size_type pos, size_type n = npos) noexcept
     {
         return unchecked_append(str.data() + pos, std::min(n, str.size() - pos));
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(
-        StringLike const& str, size_type pos, size_type n = npos) noexcept
+    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(StringLike const& str, size_type pos, size_type n = npos) noexcept
     {
         auto const str_view = self_view(str);
         return unchecked_append(str_view.data() + pos, std::min(n, str_view.size() - pos));
@@ -945,8 +908,7 @@ public:
         return *this;
     }
 
-    template <class InputIterator,
-        std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(InputIterator first, InputIterator last) noexcept;
 
     QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(std::initializer_list<CharT> il) noexcept
@@ -971,8 +933,7 @@ public:
         return try_append(str_view.data(), str_view.size());
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_append(
-        basic_inplace_string const& str, size_type pos, size_type n = npos) noexcept
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_append(basic_inplace_string const& str, size_type pos, size_type n = npos) noexcept
     {
         size_type const str_sz = str.size();
         if (pos > str_sz)
@@ -981,8 +942,7 @@ public:
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_append(
-        StringLike const& str, size_type pos, size_type n = npos) noexcept
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_append(StringLike const& str, size_type pos, size_type n = npos) noexcept
     {
         auto const str_view = self_view(str);
         size_type const str_sz = str_view.size();
@@ -1027,8 +987,7 @@ public:
         return this;
     }
 
-    template <class InputIterator,
-        std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string* try_append(InputIterator first, InputIterator last) noexcept;
 
     QX_CONSTEXPR_CXX20 basic_inplace_string* try_append(std::initializer_list<CharT> il) noexcept
@@ -1145,10 +1104,10 @@ public:
         return *this;
     }
 
-    template <class Iterator, std::enable_if_t<intl::has_iter_category_v<Iterator, std::input_iterator_tag>, int> = 0>
+    template <class Iterator, std::enable_if_t<intl::is_iter_with_category_v<Iterator, std::input_iterator_tag>, int> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string& assign(Iterator first, Iterator last)
     {
-        if constexpr (intl::has_iter_category_v<Iterator, std::forward_iterator_tag> &&
+        if constexpr (intl::is_iter_with_category_v<Iterator, std::forward_iterator_tag> &&
             intl::is_trivial_contiguous_iterator_v<Iterator>)
             assign_trivial(std::move(first), std::move(last));
         else
@@ -1156,20 +1115,14 @@ public:
         return *this;
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& assign(std::initializer_list<CharT> il)
-    {
-        return assign(il.begin(), il.size());
-    }
+    QX_CONSTEXPR_CXX20 basic_inplace_string& assign(std::initializer_list<CharT> il) { return assign(il.begin(), il.size()); }
 
     // template <ContainerCompatibleRange<CharT> R>
     // constexpr basic_inplace_string& assign_range(R&& rg);            // C++23
 
     // unchecked_assign
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(basic_inplace_string const& str) noexcept
-    {
-        return *this = str;
-    }
+    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(basic_inplace_string const& str) noexcept { return *this = str; }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(StringLike const& str) noexcept
@@ -1178,15 +1131,13 @@ public:
         return unchecked_assign(str_view.data(), str_view.size());
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(
-        basic_inplace_string const& str, size_type pos, size_type n = npos) noexcept
+    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(basic_inplace_string const& str, size_type pos, size_type n = npos) noexcept
     {
         return unchecked_assign(str.data() + pos, std::min(n, str.size() - pos));
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(
-        StringLike const& str, size_type pos, size_type n = npos) noexcept
+    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(StringLike const& str, size_type pos, size_type n = npos) noexcept
     {
         auto const str_view = self_view(str);
         return unchecked_assign(str_view.data() + pos, std::min(n, str_view.size() - pos));
@@ -1213,7 +1164,7 @@ public:
         return *this;
     }
 
-    template <class Iterator, std::enable_if_t<intl::has_iter_category_v<Iterator, std::input_iterator_tag>, int> = 0>
+    template <class Iterator, std::enable_if_t<intl::is_iter_with_category_v<Iterator, std::input_iterator_tag>, int> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(Iterator first, Iterator last) noexcept;
 
     QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(std::initializer_list<CharT> il) noexcept
@@ -1222,15 +1173,11 @@ public:
     }
 
     // template <ContainerCompatibleRange<CharT> R>
-    // constexpr basic_inplace_string& unchecked_assign_range(R&& rg) noexcept;
-    // // C++23
+    // constexpr basic_inplace_string& unchecked_assign_range(R&& rg) noexcept; // C++23
 
     // try_assign
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(basic_inplace_string const& str) noexcept
-    {
-        return std::addressof(*this = str);
-    }
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(basic_inplace_string const& str) noexcept { return std::addressof(*this = str); }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(StringLike const& str) noexcept
@@ -1239,8 +1186,7 @@ public:
         return try_assign(str_view.data(), str_view.size());
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(
-        basic_inplace_string const& str, size_type pos, size_type n = npos) noexcept
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(basic_inplace_string const& str, size_type pos, size_type n = npos) noexcept
     {
         size_type const str_size = str.size();
         if (pos > str_size)
@@ -1249,8 +1195,7 @@ public:
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(
-        StringLike const& str, size_type pos, size_type n = npos) noexcept
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(StringLike const& str, size_type pos, size_type n = npos) noexcept
     {
         auto const str_view = self_view(str);
         size_type const str_size = str_view.size();
@@ -1284,7 +1229,7 @@ public:
         return this;
     }
 
-    template <class Iterator, std::enable_if_t<intl::has_iter_category_v<Iterator, std::input_iterator_tag>, int> = 0>
+    template <class Iterator, std::enable_if_t<intl::is_iter_with_category_v<Iterator, std::input_iterator_tag>, int> = 0>
     QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(Iterator first, Iterator last) noexcept;
 
     QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(std::initializer_list<CharT> il) noexcept
@@ -1293,8 +1238,7 @@ public:
     }
 
     // template <ContainerCompatibleRange<CharT> R>
-    // constexpr basic_inplace_string& try_assign_range(R&& rg) noexcept; //
-    // C++23
+    // constexpr basic_inplace_string& try_assign_range(R&& rg) noexcept; // C++23
 
     // insert
 
@@ -1310,8 +1254,7 @@ public:
         return insert(pos1, str_view.data(), str_view.size());
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& insert(
-        size_type pos1, basic_inplace_string const& str, size_type pos2, size_type n2 = npos)
+    QX_CONSTEXPR_CXX20 basic_inplace_string& insert(size_type pos1, basic_inplace_string const& str, size_type pos2, size_type n2 = npos)
     {
         size_type const str_sz = str.size();
         if (pos2 > str_sz)
@@ -1320,8 +1263,7 @@ public:
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string& insert(
-        size_type pos1, StringLike const& str, size_type pos2, size_type n2 = npos)
+    QX_CONSTEXPR_CXX20 basic_inplace_string& insert(size_type pos1, StringLike const& str, size_type pos2, size_type n2 = npos)
     {
         auto const str_view = self_view(str);
         size_type const str_sz = str_view.size();
@@ -1357,13 +1299,13 @@ public:
         return *this;
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& insert(size_type pos, CharT const* str) // constexpr since C++20
+    QX_CONSTEXPR_CXX20 basic_inplace_string& insert(size_type pos, CharT const* str)
     {
         QX_ASSERT_CONTRACT(str != nullptr, "string::insert(pos, ptr) detected nullptr");
         return insert(pos, str, traits_type::length(str));
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& insert(size_type pos, size_type n, CharT c) // constexpr since C++20
+    QX_CONSTEXPR_CXX20 basic_inplace_string& insert(size_type pos, size_type n, CharT c)
     {
         size_type sz = size();
         if (pos > sz)
@@ -1395,11 +1337,10 @@ public:
         return begin() + diff;
     }
 
-    template <class InputIterator,
-        std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
     QX_CONSTEXPR_CXX20 iterator insert(const_iterator pos, InputIterator first, InputIterator last)
     {
-        if constexpr (intl::has_iter_category_v<InputIterator, std::forward_iterator_tag>)
+        if constexpr (intl::is_iter_with_category_v<InputIterator, std::forward_iterator_tag>)
         {
             auto const n = static_cast<size_type>(std::distance(first, last));
             return insert_with_size(pos, first, last, n);
@@ -1409,14 +1350,10 @@ public:
         return insert(pos, tmp.data(), tmp.data() + tmp.size());
     }
 
-    QX_CONSTEXPR_CXX20 iterator insert(const_iterator pos, std::initializer_list<CharT> il)
-    {
-        return insert(pos, il.begin(), il.end());
-    }
+    QX_CONSTEXPR_CXX20 iterator insert(const_iterator pos, std::initializer_list<CharT> il) { return insert(pos, il.begin(), il.end()); }
 
     // template <ContainerCompatibleRange<CharT> R>
-    // constexpr iterator insert_range(const_iterator p, R&& rg);            //
-    // C++23
+    // constexpr iterator insert_range(const_iterator p, R&& rg);            // C++23
 
     // unchecked_insert
 
@@ -1491,10 +1428,7 @@ public:
         return *this;
     }
 
-    QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, CharT c) noexcept
-    {
-        return unchecked_insert(pos, 1, c);
-    }
+    QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, CharT c) noexcept { return unchecked_insert(pos, 1, c); }
 
     QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, size_type n, CharT c) noexcept
     {
@@ -1503,8 +1437,7 @@ public:
         return begin() + diff;
     }
 
-    template <class InputIterator,
-        std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
     QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, InputIterator first, InputIterator last) noexcept;
 
     QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, std::initializer_list<CharT> il)
@@ -1539,14 +1472,13 @@ public:
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(
-        size_type pos1, StringLike const& str, size_type pos2, size_type n2 = npos) noexcept
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(size_type pos1, StringLike const& str, size_type pos2, size_type n2 = npos) noexcept
     {
         auto const str_view = self_view(str);
         size_type const str_sz = str_view.size();
         if (pos2 > str_sz)
             return nullptr;
-        return insert(pos1, str_view.data() + pos2, std::min(n2, str_sz - pos2));
+        return try_insert(pos1, str_view.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
     QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(size_type pos, CharT const* str, size_type n) noexcept
@@ -1576,15 +1508,13 @@ public:
         return this;
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(
-        size_type pos, CharT const* str) noexcept // constexpr since C++20
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(size_type pos, CharT const* str) noexcept
     {
         QX_ASSERT_CONTRACT(str != nullptr, "string::try_insert(pos, str) detected nullptr");
         return try_insert(pos, str, traits_type::length(str));
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(
-        size_type pos, size_type n, CharT c) noexcept // constexpr since C++20
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(size_type pos, size_type n, CharT c) noexcept
     {
         size_type sz = size();
         if (pos > sz)
@@ -1607,10 +1537,7 @@ public:
         return this;
     }
 
-    QX_CONSTEXPR_CXX20 std::optional<iterator> try_insert(const_iterator pos, CharT c) noexcept
-    {
-        return try_insert(pos, 1, c);
-    }
+    QX_CONSTEXPR_CXX20 std::optional<iterator> try_insert(const_iterator pos, CharT c) noexcept { return try_insert(pos, 1, c); }
 
     QX_CONSTEXPR_CXX20 std::optional<iterator> try_insert(const_iterator pos, size_type n, CharT c) noexcept
     {
@@ -1620,10 +1547,8 @@ public:
         return begin() + diff;
     }
 
-    template <class InputIterator,
-        std::enable_if_t<intl::has_iter_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
-    QX_CONSTEXPR_CXX20 std::optional<iterator> try_insert(
-        const_iterator pos, InputIterator first, InputIterator last) noexcept;
+    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
+    QX_CONSTEXPR_CXX20 std::optional<iterator> try_insert(const_iterator pos, InputIterator first, InputIterator last) noexcept;
 
     QX_CONSTEXPR_CXX20 std::optional<iterator> try_insert(const_iterator pos, std::initializer_list<CharT> il)
     {
@@ -1631,13 +1556,12 @@ public:
     }
 
     // template <ContainerCompatibleRange<CharT> R>
-    // constexpr iterator insert_range(const_iterator p, R&& rg);            //
-    // C++23
+    // constexpr iterator insert_range(const_iterator p, R&& rg);            // C++23
 
     QX_CONSTEXPR_CXX20 basic_inplace_string& erase(size_type pos = 0, size_type n = npos)
     {
         if (pos > size())
-            throw_length_error();
+            throw_out_of_range();
 
         if (n == npos)
         {
@@ -1660,9 +1584,7 @@ public:
 
     QX_CONSTEXPR_CXX20 iterator erase(const_iterator pos)
     {
-        QX_ASSERT_CONTRACT(pos != end(),
-            "inplace_string::erase(iterator) called with a non-dereferenceable "
-            "iterator");
+        QX_ASSERT_CONTRACT(pos != end(), "inplace_string::erase(iterator) called with a non-dereferenceable iterator");
         iterator const start = begin();
         auto const offset = static_cast<size_type>(pos - start);
         erase(offset, 1);
@@ -1782,11 +1704,9 @@ public:
         return *this;
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& replace(
-        const_iterator it1, const_iterator it2, basic_inplace_string const& str)
+    QX_CONSTEXPR_CXX20 basic_inplace_string& replace(const_iterator it1, const_iterator it2, basic_inplace_string const& str)
     {
-        return replace(
-            static_cast<size_type>(it1 - begin()), static_cast<size_type>(it2 - it1), str.data(), str.size());
+        return replace(static_cast<size_type>(it1 - begin()), static_cast<size_type>(it2 - it1), str.data(), str.size());
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
@@ -1796,8 +1716,7 @@ public:
         return replace(it1 - begin(), static_cast<size_type>(it2 - it1), str_view);
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& replace(
-        const_iterator it1, const_iterator it2, CharT const* str, size_type n)
+    QX_CONSTEXPR_CXX20 basic_inplace_string& replace(const_iterator it1, const_iterator it2, CharT const* str, size_type n)
     {
         return replace(static_cast<size_type>(it1 - begin()), static_cast<size_type>(it2 - it1), str, n);
     }
@@ -1820,11 +1739,9 @@ public:
     }
 
     // template <ContainerCompatibleRange<CharT> R>
-    // constexpr basic_inplace_string& replace_with_range(const_iterator i1,
-    // const_iterator i2, R&& rg); // C++23
+    // constexpr basic_inplace_string& replace_with_range(const_iterator i1, const_iterator i2, R&& rg); // C++23
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& replace(
-        const_iterator it1, const_iterator it2, std::initializer_list<CharT> il)
+    QX_CONSTEXPR_CXX20 basic_inplace_string& replace(const_iterator it1, const_iterator it2, std::initializer_list<CharT> il)
     {
         return replace(it1, it2, il.begin(), il.end());
     }
@@ -1846,12 +1763,8 @@ public:
 
     QX_CONSTEXPR_CXX20 void swap(basic_inplace_string& other) noexcept
     {
-        std::size_t const max_s = std::max(size(), other.size());
-        std::swap_ranges(rep_.data, rep_.data + max_s, other.rep_.data);
+        std::swap_ranges(rep_.data, rep_.data + N + 1, other.rep_.data);
         std::swap(rep_.size, other.rep_.size);
-        // Maintain Null Terminators
-        traits_type::assign(rep_.data[size()], value_type{});
-        traits_type::assign(other.rep_.data[other.size()], value_type{});
     }
 
     // c_str, data
@@ -1947,10 +1860,7 @@ public:
         return static_cast<size_type>(r - ptr);
     }
 
-    constexpr size_type rfind(CharT const* str, size_type pos = npos) const noexcept
-    {
-        return rfind(str, pos, traits_type::length(str));
-    }
+    constexpr size_type rfind(CharT const* str, size_type pos = npos) const noexcept { return rfind(str, pos, traits_type::length(str)); }
 
     constexpr size_type rfind(CharT c, size_type pos = npos) const noexcept
     {
@@ -2191,15 +2101,13 @@ public:
         return compare(pos1, n1, str_view.data(), str_view.size());
     }
 
-    constexpr int compare(
-        size_type pos1, size_type n1, basic_inplace_string const& str, size_type pos2, size_type n2 = npos) const
+    constexpr int compare(size_type pos1, size_type n1, basic_inplace_string const& str, size_type pos2, size_type n2 = npos) const
     {
         return compare(pos1, n1, self_view(str), pos2, n2);
     }
 
     template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    constexpr int compare(
-        size_type pos1, size_type n1, StringLike const& str, size_type pos2, size_type n2 = npos) const
+    constexpr int compare(size_type pos1, size_type n1, StringLike const& str, size_type pos2, size_type n2 = npos) const
     {
         auto const str_view = self_view(str);
         return self_view(*this).substr(pos1, n1).compare(str_view.substr(pos2, n2));
@@ -2222,7 +2130,7 @@ public:
         QX_ASSERT_CONTRACT(n2 == 0 || str != nullptr, "inplace_string::compare(pos1, n1, ptr, n2) detected nullptr");
         size_type const sz = size();
 
-        if (pos1 > sz || n2 == npos)
+        if (pos1 > sz)
             throw_out_of_range();
 
         size_type const rlen = std::min(n1, sz - pos1);
@@ -2238,7 +2146,7 @@ public:
         return r;
     }
 
-#if __cplusplus > 202002L
+#if __cplusplus >= 202002L
 
     // starts_with
 
@@ -2253,10 +2161,7 @@ public:
 
     // ends_with
 
-    constexpr bool ends_with(std::basic_string_view<CharT, Traits> sv) const noexcept
-    {
-        return self_view(data(), size()).ends_with(sv);
-    }
+    constexpr bool ends_with(std::basic_string_view<CharT, Traits> sv) const noexcept { return self_view(data(), size()).ends_with(sv); }
 
     constexpr bool ends_with(CharT c) const noexcept { return !empty() && traits_type::eq(back(), c); }
 
@@ -2268,10 +2173,7 @@ public:
 
     // contains
 
-    constexpr bool contains(std::basic_string_view<CharT, Traits> sv) const noexcept
-    {
-        return self_view(data(), size()).contains(sv);
-    }
+    constexpr bool contains(std::basic_string_view<CharT, Traits> sv) const noexcept { return self_view(data(), size()).contains(sv); }
 
     constexpr bool contains(CharT c) const noexcept { return self_view(data(), size()).contains(c); }
 
@@ -2283,17 +2185,17 @@ private:
     // The actual size type used for storing the size of the string. It is chosen based on the maximum size of the
     // string (N) to save space. It is guaranteed to be large enough to store any size up to N, and it is an unsigned
     // integer type for simplicity of implementation.
-    template <class SizeT, class T, std::size_t M>
+    template <class SizeT, class ChT, std::size_t M>
     struct alignas(size_type) inplace_string_storage
     {
         union // NOLINT(*-non-private-member-variables-in-classes)
         {
             SizeT size{};
-            T pad; //< ensures similar layout to libc++ short representation
+            ChT pad; //< ensures similar layout to libc++ short representation
         };
-        T data[M + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
+        ChT data[M + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
 
-        constexpr inplace_string_storage() noexcept { data[0] = T{}; } // NOTE: to avoid full buffer init
+        constexpr inplace_string_storage() noexcept { data[0] = ChT{}; } // NOTE: to avoid full buffer init
     };
 
     // internal type used to store the size information, automatically changes between capacities
@@ -2310,8 +2212,8 @@ private:
 
     QX_CONSTEXPR_CXX20 void set_size_and_null_terminate(size_type n) noexcept
     {
-        QX_ASSERT_CONTRACT(n <= std::numeric_limits<compressed_size_type>::max(),
-            "inplace_string::set_size_and_null_terminate(n) size overflow");
+        QX_ASSERT_CONTRACT(
+            n <= std::numeric_limits<compressed_size_type>::max(), "inplace_string::set_size_and_null_terminate(n) size overflow");
         traits_type::assign(rep_.data[n], value_type{});
         rep_.size = static_cast<compressed_size_type>(n);
     }
@@ -2335,7 +2237,7 @@ private:
     template <class InputIterator>
     QX_CONSTEXPR_CXX20 void init(InputIterator first, InputIterator last)
     {
-        if constexpr (intl::has_iter_category_v<InputIterator, std::forward_iterator_tag>)
+        if constexpr (intl::is_iter_with_category_v<InputIterator, std::forward_iterator_tag>)
         {
             auto const sz = static_cast<size_type>(std::distance(first, last));
             init_with_size(std::move(first), std::move(last), sz);
@@ -2358,8 +2260,7 @@ private:
     QX_CONSTEXPR_CXX20 void assign_trivial(Iterator first, Sentinel last)
     {
         QX_ASSERT_CONTRACT(intl::is_trivial_contiguous_iterator_v<Iterator>,
-            "inplace_string::assign_trivial(first, last): the iterator type "
-            "must be trivial");
+            "inplace_string::assign_trivial(first, last): the iterator type must be trivial");
 
         auto const n = static_cast<size_type>(std::distance(first, last));
         if (n > capacity())
@@ -2450,8 +2351,7 @@ private:
 
     QX_CONSTEXPR_CXX20 void erase_to_end(size_type pos)
     {
-        QX_ASSERT_CONTRACT(
-            pos <= capacity(), "inplace_string::erase_to_end(pos) trying to erase positions outside the capacity");
+        QX_ASSERT_CONTRACT(pos <= capacity(), "inplace_string::erase_to_end(pos) trying to erase positions outside the capacity");
         set_size_and_null_terminate(pos);
     }
 
@@ -2464,11 +2364,11 @@ private:
     template <class Iterator, class Sentinel>
     static QX_CONSTEXPR_CXX20 pointer copy_non_overlapping_range(Iterator first, Sentinel last, pointer dest)
     {
-        if constexpr (intl::is_contiguous_iterator_v<Iterator> &&
-            std::is_same_v<value_type, intl::iter_value_t<Iterator>> && std::is_same_v<Iterator, Sentinel>)
+        if constexpr (intl::is_contiguous_iterator_v<Iterator> && std::is_same_v<value_type, intl::iter_value_t<Iterator>> &&
+            std::is_same_v<Iterator, Sentinel>)
         {
-            auto const first_addr = intl::to_address(std::move(first));
-            auto const last_addr = intl::to_address(std::move(last));
+            const_pointer const first_addr = intl::to_address(std::move(first));
+            const_pointer const last_addr = intl::to_address(std::move(last));
             QX_ASSERT_CONTRACT(!intl::is_overlapping_range(first_addr, last_addr, dest),
                 "inplace_string::copy_non_overlapping_range(first, last, dest) called with an overlapping range!");
             auto const n_copy = last_addr - first_addr;
@@ -2481,8 +2381,7 @@ private:
         return dest;
     }
 
-    static constexpr const_pointer find_first_of_ce(
-        const_pointer first1, const_pointer last1, const_pointer first2, const_pointer last2)
+    static constexpr const_pointer find_first_of_ce(const_pointer first1, const_pointer last1, const_pointer first2, const_pointer last2)
     {
         for (; first1 != last1; ++first1)
         {
@@ -2532,8 +2431,7 @@ private:
 };
 
 template <std::size_t N, class CharT, class Traits, std::size_t M>
-inline bool operator==(
-    basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
+inline bool operator==(basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
 {
     std::size_t const lhs_sz = lhs.size();
     return lhs_sz == rhs.size() && Traits::compare(lhs.data(), rhs.data(), lhs_sz) == 0;
@@ -2564,8 +2462,7 @@ inline bool operator==(CharT const* lhs, basic_inplace_string<N, CharT, Traits> 
 #if __cplusplus >= 202002L
 
 template <std::size_t N, class CharT, class Traits, std::size_t M>
-constexpr auto operator<=>(
-    basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
+constexpr auto operator<=>(basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
 {
     return std::basic_string_view<CharT, Traits>(lhs) <=> std::basic_string_view<CharT, Traits>(rhs);
 }
@@ -2579,8 +2476,7 @@ constexpr auto operator<=>(basic_inplace_string<N, CharT, Traits> const& lhs, Ch
 #else // __cplusplus >= 202002L
 
 template <std::size_t N, class CharT, class Traits, std::size_t M>
-inline bool operator!=(
-    basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
+inline bool operator!=(basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
 {
     return !(lhs == rhs);
 }
@@ -2600,8 +2496,7 @@ inline bool operator!=(basic_inplace_string<N, CharT, Traits> const& lhs, CharT 
 // operator<
 
 template <std::size_t N, class CharT, class Traits, std::size_t M>
-inline bool operator<(
-    basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
+inline bool operator<(basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
 {
     return lhs.compare(rhs) < 0;
 }
@@ -2621,8 +2516,7 @@ inline bool operator<(CharT const* lhs, basic_inplace_string<N, CharT, Traits> c
 // operator>
 
 template <std::size_t N, class CharT, class Traits, std::size_t M>
-inline bool operator>(
-    basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
+inline bool operator>(basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
 {
     return rhs < lhs;
 }
@@ -2642,8 +2536,7 @@ inline bool operator>(CharT const* lhs, basic_inplace_string<N, CharT, Traits> c
 // operator<=
 
 template <std::size_t N, class CharT, class Traits, std::size_t M>
-inline bool operator<=(
-    basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
+inline bool operator<=(basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
 {
     return !(rhs < lhs);
 }
@@ -2663,8 +2556,7 @@ inline bool operator<=(CharT const* lhs, basic_inplace_string<N, CharT, Traits> 
 // operator>=
 
 template <std::size_t N, class CharT, class Traits, std::size_t M>
-inline bool operator>=(
-    basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
+inline bool operator>=(basic_inplace_string<N, CharT, Traits> const& lhs, basic_inplace_string<M, CharT, Traits> const& rhs) noexcept
 {
     return !(lhs < rhs);
 }
@@ -2712,8 +2604,7 @@ inline bool operator>=(CharT const* lhs, basic_inplace_string<N, CharT, Traits> 
 // swap
 
 template <std::size_t N, class CharT, class Traits>
-inline QX_CONSTEXPR_CXX20 void swap(
-    basic_inplace_string<N, CharT, Traits>& lhs, basic_inplace_string<N, CharT, Traits>& rhs) noexcept
+inline QX_CONSTEXPR_CXX20 void swap(basic_inplace_string<N, CharT, Traits>& lhs, basic_inplace_string<N, CharT, Traits>& rhs) noexcept
 {
     lhs.swap(rhs);
 }
@@ -2750,7 +2641,7 @@ std::optional<inplace_string<N>> try_to_inplace_string(T val) noexcept
     auto const [end, ec] = std::to_chars(begin, begin + N, val);
     if (ec != std::errc())
         return std::nullopt;
-    res.set_size_and_null_terminate(static_cast<std::size_t>(end - begin)); // fix: added cast
+    res.set_size_and_null_terminate(static_cast<std::size_t>(end - begin));
     return res;
 }
 
@@ -2759,7 +2650,7 @@ inplace_string<N> to_inplace_string(T val)
 {
     inplace_string<N> res;
     auto const begin = res.data();
-    auto const [end, ec] = std::to_chars(begin, begin + N, val); // fix: const
+    auto const [end, ec] = std::to_chars(begin, begin + N, val);
     if (ec != std::errc())
         inplace_string<N>::throw_length_error();
     res.set_size_and_null_terminate(static_cast<std::size_t>(end - begin));
@@ -2771,8 +2662,7 @@ auto to_inplace_string(T val) noexcept
 {
     static constexpr std::size_t kRequiredN = std::is_integral_v<T>
         ? 2 + std::numeric_limits<T>::digits10 // integral types
-        : 4 + std::numeric_limits<T>::max_digits10 +
-            std::max(2, intl::ceil_log10<std::numeric_limits<T>::max_exponent10>::value);
+        : 4 + std::numeric_limits<T>::max_digits10 + std::max(2, intl::ceil_log10<std::numeric_limits<T>::max_exponent10>::value);
 
     using SizeT = intl::min_size_t<kRequiredN>;
     static constexpr std::size_t kSizeSize = std::max(sizeof(SizeT), sizeof(char));

@@ -36,7 +36,7 @@ TEST(InplaceStringErase, ClearAndPopBack)
 TEST(InplaceStringErase, ExceptionsAndContracts)
 {
     qx::inplace_string<10> s("abc");
-    EXPECT_THROW(s.erase(5, 1), std::length_error);
+    EXPECT_THROW(s.erase(5, 1), std::out_of_range);
 
     qx::inplace_string<10> s_empty;
     EXPECT_DEATH(s_empty.pop_back(), "contract violation");
