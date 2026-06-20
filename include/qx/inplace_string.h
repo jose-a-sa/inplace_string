@@ -49,7 +49,9 @@
 #elif defined(_MSVC_STL_VERSION) || defined(_CPPLIB_VER)
 #define QX_STL_MSVC
 #else
-// TODO(jose): what if this happens
+#if __cplusplus < 202002L
+#error "qx::inplace_string not supported: unknown STL in CXX17"
+#endif
 #endif
 #endif
 
@@ -229,7 +231,7 @@ using min_size_t =
     std::size_t>>>>;
 // clang-format on
 
-// ceil_log10 helper
+// max_exponent_digits10_v helper
 
 template <std::size_t N>
 struct ceil_log10
@@ -239,6 +241,9 @@ struct ceil_log10
 template <>
 struct ceil_log10<0> : std::integral_constant<int, 1>
 {};
+
+template <class T>
+inline constexpr auto max_exponent_digits10_v = ceil_log10<std::numeric_limits<T>::max_exponent10>::value;
 
 // iterator_value
 
@@ -2210,6 +2215,8 @@ private:
 
     [[noreturn]] static QX_COLD_NOINLINE void throw_length_error() { throw std::length_error{"basic_inplace_string"}; }
 
+    // size and null termination as single operation
+
     QX_CONSTEXPR_CXX20 void set_size_and_null_terminate(size_type n) noexcept
     {
         QX_ASSERT_CONTRACT(
@@ -2662,16 +2669,13 @@ auto to_inplace_string(T val) noexcept
 {
     static constexpr std::size_t kRequiredN = std::is_integral_v<T>
         ? 2 + std::numeric_limits<T>::digits10 // integral types
-        : 4 + std::numeric_limits<T>::max_digits10 + std::max(2, intl::ceil_log10<std::numeric_limits<T>::max_exponent10>::value);
+        : 4 + std::numeric_limits<T>::max_digits10 + std::max(2, intl::max_exponent_digits10_v<T>);
 
     using SizeT = intl::min_size_t<kRequiredN>;
+    using ReqStrT = inplace_string<kRequiredN>;
     static constexpr std::size_t kSizeSize = std::max(sizeof(SizeT), sizeof(char));
+    static constexpr std::size_t kOptimalN = ((sizeof(ReqStrT) - kSizeSize) / sizeof(char)) - 1;
 
-    static constexpr std::size_t kStorageAlign = std::max(sizeof(std::size_t), kSizeSize);
-    static constexpr std::size_t kStorageRawSize = kSizeSize + ((kRequiredN + 1) * sizeof(char));
-    static constexpr std::size_t kStorageSize = (kStorageRawSize + kStorageAlign - 1) & ~(kStorageAlign - 1);
-
-    static constexpr std::size_t kOptimalN = ((kStorageSize - kSizeSize) / sizeof(char)) - 1;
     return unchecked_to_inplace_string<kOptimalN>(val);
 }
 
