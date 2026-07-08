@@ -59,10 +59,6 @@ TEST(InplaceStringAssign, UncheckedAssign)
 
     s.unchecked_assign({'n', 'e', 'w'});
     EXPECT_STREQ(s.c_str(), "new");
-
-    qx::inplace_string<10> const src("abcdef");
-    s.unchecked_assign(src, 1, 3);
-    EXPECT_STREQ(s.c_str(), "bcd");
 }
 
 TEST(InplaceStringAssign, TryAssign)
@@ -77,9 +73,7 @@ TEST(InplaceStringAssign, TryAssign)
     EXPECT_NE(s.try_assign(4, 'z'), nullptr);
     EXPECT_EQ(s.try_assign(11, 'z'), nullptr);
 
-    qx::inplace_string<10> const src("abcdef");
-    EXPECT_NE(s.try_assign(src, 2, 3), nullptr);
-    EXPECT_EQ(s.try_assign(src, 99, 1), nullptr);
+    EXPECT_STREQ(s.try_append(std::string("new"))->c_str(), "zzzznew");
 }
 
 TEST(InplaceStringAssign, OperatorAssign)
