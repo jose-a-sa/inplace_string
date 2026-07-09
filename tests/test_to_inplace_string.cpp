@@ -26,7 +26,7 @@ TEST(InplaceString, TryToInplaceStringReportsCapacityFit)
     EXPECT_TRUE((qx::try_to_inplace_string<3>(255)));
 
     EXPECT_TRUE((qx::try_to_inplace_string<5, int>(-42)));
-    EXPECT_FALSE((qx::try_to_inplace_string<4, int>(1000)));
+    EXPECT_FALSE((qx::try_to_inplace_string<4, int>(10000)));
     EXPECT_TRUE((qx::try_to_inplace_string<20, std::int64_t>(std::numeric_limits<std::int64_t>::min())));
 }
 
