@@ -611,8 +611,8 @@ public:
         init(n, c);
     }
 
-    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string(InputIterator begin, InputIterator end)
+    template <class Iterator, std::enable_if_t<intl::is_iter_with_category_v<Iterator, std::input_iterator_tag>, int> = 0>
+    QX_CONSTEXPR_CXX20 basic_inplace_string(Iterator begin, Iterator end)
         : basic_inplace_string()
     {
         init(begin, end);
@@ -827,17 +827,17 @@ public:
         return *this;
     }
 
-    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string& append(InputIterator first, InputIterator last)
+    template <class Iterator, std::enable_if_t<intl::is_iter_with_category_v<Iterator, std::input_iterator_tag>, int> = 0>
+    QX_CONSTEXPR_CXX20 basic_inplace_string& append(Iterator first, Iterator last)
     {
-        if constexpr (intl::is_iter_with_category_v<InputIterator, std::forward_iterator_tag>)
+        if constexpr (intl::is_iter_with_category_v<Iterator, std::forward_iterator_tag>)
         {
             size_type const sz = size();
             auto const n = static_cast<size_type>(std::distance(first, last));
             if (n == 0)
                 return *this;
 
-            if (intl::is_trivial_contiguous_iterator_v<InputIterator> && !address_in_range(*first))
+            if (intl::is_trivial_contiguous_iterator_v<Iterator> && !address_in_range(*first))
             {
                 if (n > capacity() - sz)
                     throw_length_error();
@@ -911,29 +911,6 @@ public:
         return *this;
     }
 
-    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(InputIterator first, InputIterator last) noexcept
-    {
-        if constexpr (intl::is_iter_with_category_v<InputIterator, std::forward_iterator_tag>)
-        {
-            size_type const sz = size();
-            auto const n = static_cast<size_type>(std::distance(first, last));
-            if (n == 0)
-                return *this;
-
-            if (intl::is_trivial_contiguous_iterator_v<InputIterator> && !address_in_range(*first))
-            {
-                copy_non_overlapping_range(first, last, data() + sz);
-                set_size_and_null_terminate(sz + n);
-                return *this;
-            }
-        }
-
-        basic_inplace_string const tmp(first, last);
-        append(tmp.data(), tmp.size());
-        return *this;
-    }
-
     QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(std::initializer_list<CharT> il) noexcept
     {
         return unchecked_append(il.begin(), il.size());
@@ -991,6 +968,10 @@ public:
         }
         return this;
     }
+
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_append(std::initializer_list<CharT> il) { return try_append(il.begin(), il.size()); }
+
+    // push_back
 
     QX_CONSTEXPR_CXX20 basic_inplace_string& push_back(CharT c)
     {
@@ -1144,6 +1125,9 @@ public:
         return *this;
     }
 
+    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(std::initializer_list<CharT> il) { return unchecked_assign(il.begin(), il.size()); }
+
+
     // try_assign
 
     QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(basic_inplace_string const& str) noexcept { return std::addressof(*this = str); }
@@ -1179,6 +1163,8 @@ public:
         set_size_and_null_terminate(n);
         return this;
     }
+
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_assign(std::initializer_list<CharT> il) { return try_assign(il.begin(), il.size()); }
 
     // insert
 
@@ -1277,10 +1263,10 @@ public:
         return begin() + diff;
     }
 
-    template <class InputIterator, std::enable_if_t<intl::is_iter_with_category_v<InputIterator, std::input_iterator_tag>, int> = 0>
-    QX_CONSTEXPR_CXX20 iterator insert(const_iterator pos, InputIterator first, InputIterator last)
+    template <class Iterator, std::enable_if_t<intl::is_iter_with_category_v<Iterator, std::input_iterator_tag>, int> = 0>
+    QX_CONSTEXPR_CXX20 iterator insert(const_iterator pos, Iterator first, Iterator last)
     {
-        if constexpr (intl::is_iter_with_category_v<InputIterator, std::forward_iterator_tag>)
+        if constexpr (intl::is_iter_with_category_v<Iterator, std::forward_iterator_tag>)
         {
             auto const n = static_cast<size_type>(std::distance(first, last));
             return insert_with_size(pos, first, last, n);
@@ -1360,6 +1346,9 @@ public:
         unchecked_insert(static_cast<size_type>(diff), n, c);
         return begin() + diff;
     }
+
+    QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, std::initializer_list<CharT> il) { return unchecked_insert(pos, il.begin(), il.ize()); }
+
 
     // try_insert
 
@@ -1441,6 +1430,10 @@ public:
         return begin() + diff;
     }
 
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(const_iterator pos, std::initializer_list<CharT> il) { return try_insert(pos, il.begin(), il.size()); }
+    
+    // erase
+
     QX_CONSTEXPR_CXX20 basic_inplace_string& erase(size_type pos = 0, size_type n = npos)
     {
         if (pos > size())
@@ -1482,6 +1475,8 @@ public:
         erase(offset, static_cast<size_type>(last - first));
         return start + static_cast<difference_type>(offset);
     }
+
+    // replace
 
     QX_CONSTEXPR_CXX20 basic_inplace_string& replace(size_type pos1, size_type n1, basic_inplace_string const& str)
     {
@@ -2119,10 +2114,10 @@ private:
         set_size_and_null_terminate(n);
     }
 
-    template <class InputIterator>
-    QX_CONSTEXPR_CXX20 void init(InputIterator first, InputIterator last)
+    template <class Iterator>
+    QX_CONSTEXPR_CXX20 void init(Iterator first, Iterator last)
     {
-        if constexpr (intl::is_iter_with_category_v<InputIterator, std::forward_iterator_tag>)
+        if constexpr (intl::is_iter_with_category_v<Iterator, std::forward_iterator_tag>)
         {
             auto const sz = static_cast<size_type>(std::distance(first, last));
             init_with_size(std::move(first), std::move(last), sz);
