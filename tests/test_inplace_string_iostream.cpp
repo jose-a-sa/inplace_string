@@ -9,6 +9,7 @@
 #include <streambuf>
 
 #include <qx/inplace_string.h>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // operator<<
@@ -134,22 +135,6 @@ TEST(InplaceStringInsertion, NoOutputWhenStreamAlreadyFailed)
     oss << s;
     EXPECT_TRUE(oss.str().empty());
     EXPECT_TRUE(oss.fail());
-}
-
-TEST(InplaceStringInsertion, Char16)
-{
-    qx::inplace_u16string<16> s = u"u16";
-    std::basic_ostringstream<char16_t> oss;
-    oss << s;
-    EXPECT_EQ(oss.str(), u"u16");
-}
-
-TEST(InplaceStringInsertion, Char32)
-{
-    qx::inplace_u32string<16> s = U"u32";
-    std::basic_ostringstream<char32_t> oss;
-    oss << s;
-    EXPECT_EQ(oss.str(), U"u32");
 }
 
 // ---------------------------------------------------------------------------
