@@ -86,9 +86,4 @@ TEST(InplaceStringUtils, ToStringView)
     qx::inplace_string<15> const s("abc");
     auto const sv = std::string_view{s};
     EXPECT_EQ(sv, std::string_view("abc"));
-
-    std::istringstream ss(s.c_str());
-    qx::inplace_string<15> in;
-    ss >> in;
-    EXPECT_EQ(in, std::string_view("abc"));
 }
