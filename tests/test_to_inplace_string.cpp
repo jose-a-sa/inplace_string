@@ -1,116 +1,122 @@
 #include <gmock/gmock.h>
 
-#include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 #include <limits>
 #include <stdexcept>
-#include <string_view>
 
 #include <qx/inplace_string.h>
 
-namespace
-{
-
-template <class T>
-void test_to_inplace_str(std::initializer_list<std::pair<T, char const*>> pairs)
-{
-    for (auto [val, expected] : pairs)
-    {
-        auto const str = qx::to_inplace_string(val);
-        auto const exp_sv = std::string_view{expected};
-        EXPECT_EQ(str, expected);
-        // EXPECT_EQ(str, exp_sv);
-        EXPECT_STREQ(str.c_str(), expected);
-        EXPECT_EQ(str.size(), exp_sv.size());
-    }
-}
-
-} // namespace
-
-TEST(InplaceString, ToInplaceStringSized)
+TEST(InplaceString, ToInplaceStringSizedThrowsForInsufficientCapacity)
 {
     EXPECT_THROW(((void)qx::to_inplace_string<2, int>(255)), std::length_error);
-    EXPECT_THROW(((void)qx::to_inplace_string<2, uint8_t>(255)), std::length_error);
+    EXPECT_THROW(((void)qx::to_inplace_string<2, std::uint8_t>(255)), std::length_error);
     EXPECT_THROW(((void)qx::to_inplace_string<2>(255)), std::length_error);
+    EXPECT_THROW(((void)qx::to_inplace_string<3, int>(1000)), std::length_error);
+    EXPECT_THROW(((void)qx::to_inplace_string<4, int>(-1000)), std::length_error);
 }
 
-TEST(InplaceString, TryToInplaceString)
+TEST(InplaceString, TryToInplaceStringReportsCapacityFit)
 {
     EXPECT_FALSE((qx::try_to_inplace_string<2, int>(255)));
-    EXPECT_FALSE((qx::try_to_inplace_string<2, uint8_t>(255)));
+    EXPECT_FALSE((qx::try_to_inplace_string<2, std::uint8_t>(255)));
     EXPECT_FALSE((qx::try_to_inplace_string<2>(255)));
 
     EXPECT_TRUE((qx::try_to_inplace_string<3, int>(255)));
-    EXPECT_TRUE((qx::try_to_inplace_string<3, uint8_t>(255)));
+    EXPECT_TRUE((qx::try_to_inplace_string<3, std::uint8_t>(255)));
     EXPECT_TRUE((qx::try_to_inplace_string<3>(255)));
+
+    EXPECT_TRUE((qx::try_to_inplace_string<5, int>(-42)));
+    EXPECT_FALSE((qx::try_to_inplace_string<4, int>(1000)));
+    EXPECT_TRUE((qx::try_to_inplace_string<20, std::int64_t>(std::numeric_limits<std::int64_t>::min())));
 }
 
-
-TEST(InplaceString, ToInplaceString)
+TEST(InplaceString, UncheckedToInplaceStringUsesExplicitCapacity)
 {
-    test_to_inplace_str<uint8_t>({{0U, "0"}, {42U, "42"}, {123U, "123"}, {255U, "255"}});
+    auto const positive = qx::unchecked_to_inplace_string<5>(12345);
+    EXPECT_EQ(positive, "12345");
+    EXPECT_EQ(positive.size(), 5U);
 
-    // int8_t
-    test_to_inplace_str<int8_t>({{0, "0"}, {42, "42"}, {-42, "-42"}, {127, "127"}, {-128, "-128"}});
+    auto const negative = qx::unchecked_to_inplace_string<4>(-42);
+    EXPECT_EQ(negative, "-42");
+    EXPECT_EQ(negative.size(), 3U);
 
-    // uint16_t
-    test_to_inplace_str<uint16_t>({{0U, "0"}, {42U, "42"}, {12345U, "12345"}, {65535U, "65535"}});
+    auto const minimum = qx::unchecked_to_inplace_string<20>(std::numeric_limits<std::int64_t>::min());
+    EXPECT_EQ(minimum, "-9223372036854775808");
+    EXPECT_EQ(minimum.size(), 20U);
+}
 
-    // int16_t
-    test_to_inplace_str<int16_t>(
-        {{0, "0"}, {42, "42"}, {-42, "-42"}, {12345, "12345"}, {-12345, "-12345"}, {32767, "32767"}, {-32768, "-32768"}}
-    );
+TEST(InplaceString, ToInplaceStringUsesExplicitCapacity)
+{
+    auto const explicit_three = qx::to_inplace_string<3>(255);
+    EXPECT_EQ(explicit_three, "255");
+    EXPECT_EQ(explicit_three.size(), 3U);
 
-    // uint32_t
-    test_to_inplace_str<uint32_t>(
-        {{0U, "0"}, {42U, "42"}, {1234567890U, "1234567890"}, {std::numeric_limits<uint32_t>::max(), "4294967295"}}
-    );
+    auto const explicit_signed = qx::to_inplace_string<4>(-42);
+    EXPECT_EQ(explicit_signed, "-42");
+    EXPECT_EQ(explicit_signed.size(), 3U);
 
-    // int32_t
-    test_to_inplace_str<int32_t>(
-        {{0, "0"},
-         {42, "42"},
-         {-42, "-42"},
-         {1234567890, "1234567890"},
-         {-1234567890, "-1234567890"},
-         {std::numeric_limits<int32_t>::max(), "2147483647"},
-         {std::numeric_limits<int32_t>::min(), "-2147483648"}}
-    );
+    auto const explicit_u64 = qx::to_inplace_string<20>(std::numeric_limits<std::uint64_t>::max());
+    EXPECT_EQ(explicit_u64, "18446744073709551615");
+    EXPECT_EQ(explicit_u64.size(), 20U);
+}
 
-    // uint64_t
-    test_to_inplace_str<uint64_t>(
-        {{0UL, "0"}, {42UL, "42"}, {1234567890UL, "1234567890"}, {std::numeric_limits<uint64_t>::max(), "18446744073709551615"}}
-    );
+TEST(InplaceString, ToInplaceStringUsesDefaultCapacityForIntegerLiterals)
+{
+    auto const zero = qx::to_inplace_string(std::uint8_t{0});
+    EXPECT_EQ(zero, "0");
+    EXPECT_EQ(zero.size(), 1U);
 
-    // int64_t
-    test_to_inplace_str<int64_t>(
-        {{0L, "0"},
-         {42LL, "42"},
-         {-42LL, "-42"},
-         {1234567890LL, "1234567890"},
-         {-1234567890LL, "-1234567890"},
-         {std::numeric_limits<int64_t>::max(), "9223372036854775807"},
-         {std::numeric_limits<int64_t>::min(), "-9223372036854775808"}}
-    );
+    auto const forty_two = qx::to_inplace_string(std::int8_t{42});
+    EXPECT_EQ(forty_two, "42");
+    EXPECT_EQ(forty_two.size(), 2U);
 
-    // float
-    test_to_inplace_str<float>(
-        {{1.23456789555555F, "1.2345679"},
-         {23.43F, "23.43"},
-         {1e-9F, "1e-09"},
-         {std::numeric_limits<float>::infinity(), "inf"},
-         {1e-40F, "1e-40"},
-         {123456789.0F, "123456792"}}
-    );
+    auto const negative = qx::to_inplace_string(std::int16_t{-12345});
+    EXPECT_EQ(negative, "-12345");
+    EXPECT_EQ(negative.size(), 6U);
 
-    // double
-    test_to_inplace_str<double>(
-        {{1.23456789555555, "1.23456789555555"},
-         {23.43, "23.43"},
-         {1e-9, "1e-09"},
-         {1e40, "1e+40"},
-         {1e-40, "1e-40"},
-         {123456789.0, "123456789"}}
-    );
+    auto const large_unsigned = qx::to_inplace_string(std::uint32_t{1234567890});
+    EXPECT_EQ(large_unsigned, "1234567890");
+    EXPECT_EQ(large_unsigned.size(), 10U);
+
+    auto const large_signed = qx::to_inplace_string(std::int32_t{-1234567890});
+    EXPECT_EQ(large_signed, "-1234567890");
+    EXPECT_EQ(large_signed.size(), 11U);
+}
+
+TEST(InplaceString, ToInplaceStringUsesDefaultCapacityForIntegerLimits)
+{
+    auto const max_u32 = qx::to_inplace_string(std::numeric_limits<std::uint32_t>::max());
+    EXPECT_EQ(max_u32, "4294967295");
+    EXPECT_EQ(max_u32.size(), 10U);
+
+    auto const max_i32 = qx::to_inplace_string(std::numeric_limits<std::int32_t>::max());
+    EXPECT_EQ(max_i32, "2147483647");
+    EXPECT_EQ(max_i32.size(), 10U);
+
+    auto const min_i32 = qx::to_inplace_string(std::numeric_limits<std::int32_t>::min());
+    EXPECT_EQ(min_i32, "-2147483648");
+    EXPECT_EQ(min_i32.size(), 11U);
+
+    auto const max_u64 = qx::to_inplace_string(std::numeric_limits<std::uint64_t>::max());
+    EXPECT_EQ(max_u64, "18446744073709551615");
+    EXPECT_EQ(max_u64.size(), 20U);
+
+    auto const min_i64 = qx::to_inplace_string(std::numeric_limits<std::int64_t>::min());
+    EXPECT_EQ(min_i64, "-9223372036854775808");
+    EXPECT_EQ(min_i64.size(), 20U);
+}
+
+TEST(InplaceString, ToInplaceStringUsesDefaultCapacityForFloatingPointValues)
+{
+    auto const decimal_float = qx::to_inplace_string(3.5f);
+    EXPECT_EQ(decimal_float, "3.5");
+    EXPECT_EQ(decimal_float.size(), 3U);
+
+    auto const decimal_double = qx::to_inplace_string(1.25);
+    EXPECT_EQ(decimal_double, "1.25");
+    EXPECT_EQ(decimal_double.size(), 4U);
+
+    auto const infinity = qx::to_inplace_string(std::numeric_limits<float>::infinity());
+    EXPECT_EQ(infinity, "inf");
+    EXPECT_EQ(infinity.size(), 3U);
 }

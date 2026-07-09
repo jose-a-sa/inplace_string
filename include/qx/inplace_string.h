@@ -2589,79 +2589,62 @@ basic_ostream<CharT, Traits>& operator<<(basic_ostream<CharT, Traits>& os, qx::b
 template <class CharT, class Traits, std::size_t N>
 basic_istream<CharT, Traits>& operator>>(basic_istream<CharT, Traits>& is, qx::basic_inplace_string<N, CharT, Traits>& str)
 {
-    using Size = typename qx::basic_inplace_string<N, CharT, Traits>::size_type;
-
-    std::ios_base::iostate state = std::ios_base::goodbit;
-    typename std::basic_istream<CharT, Traits>::sentry sen(is);
-
-    if (sen)
+    ios_base::iostate state = ios_base::goodbit;
+    typename basic_istream<CharT, Traits>::sentry sentry(is);
+    if (sentry)
     {
+        streamsize const width = is.width();
+        is.width(0); // reset unconditionally, regardless of what follows
+ 
         try
         {
             str.clear();
-            streamsize width = is.width();
-            Size max_size = str.max_size();
-            Size n;
-            if (width <= 0)
-                n = max_size;
-            else
-                n = static_cast<make_unsigned_t<streamsize>>(width) < max_size ? static_cast<Size>(width) : max_size;
-
-            Size count = 0;
-            ctype<CharT> const& ct = use_facet<ctype<CharT>>(is.getloc());
-            while (count < n)
+            auto const& ct = use_facet<ctype<CharT>>(is.getloc());
+            auto* buf = is.rdbuf();
+            while (width <= 0 || static_cast<streamsize>(str.size()) < width)
             {
-                typename Traits::int_type i = is.rdbuf()->sgetc();
-
-                if (Traits::eq_int_type(i, Traits::eof()))
+                auto const c = buf->sgetc();
+                if (Traits::eq_int_type(c, Traits::eof()))
                 {
-                    state |= std::ios_base::eofbit;
+                    state |= ios_base::eofbit;
                     break;
                 }
-
-                CharT ch = Traits::to_char_type(i);
-
+ 
+                CharT const ch = Traits::to_char_type(c);
                 if (ct.is(ctype_base::space, ch))
                     break;
-
-                str.push_back(ch);
-                ++count;
-                is.rdbuf()->sbumpc();
+ 
+                str.push_back(ch); // throws length_error if the word needs more than N chars
+                buf->sbumpc();
             }
-
-            is.width(0);
-
-            if (count == 0)
-                state |= std::ios_base::failbit;
+ 
+            if (str.empty())
+                state |= ios_base::failbit;
         }
         catch (...)
         {
-            state |= std::ios_base::badbit;
-
-            auto exceptions = is.exceptions();
+            state |= ios_base::badbit;
+            auto const mask = is.exceptions();
             try
             {
-                is.exceptions(std::ios_base::goodbit);
+                is.exceptions(ios_base::goodbit);
                 is.setstate(state);
-                is.exceptions(exceptions);
+                is.exceptions(mask);
             }
             catch (...)
             {
-                try
-                {
-                    is.exceptions(exceptions);
-                }
-                catch (...)
-                {}
             }
-
-            if (exceptions & std::ios_base::badbit)
-                throw;
+ 
+            if (mask & ios_base::badbit)
+                throw; // still resolves to the ORIGINAL exception, not the swallowed one above
         }
-
+ 
         is.setstate(state);
     }
-
+    else
+    {
+        is.setstate(ios_base::failbit);
+    }
     return is;
 }
 
