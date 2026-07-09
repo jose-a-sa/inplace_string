@@ -868,18 +868,6 @@ public:
         return unchecked_append(str_view.data(), str_view.size());
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(basic_inplace_string const& str, size_type pos, size_type n = npos) noexcept
-    {
-        return unchecked_append(str.data() + pos, std::min(n, str.size() - pos));
-    }
-
-    template <class StringLike, enable_if_unsame_string_like_t<StringLike> = 0>
-    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(StringLike const& str, size_type pos, size_type n = npos) noexcept
-    {
-        auto const str_view = self_view(str);
-        return unchecked_append(str_view.data() + pos, std::min(n, str_view.size() - pos));
-    }
-
     QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_append(CharT const* str, size_type n) noexcept
     {
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::unchecked_append(ptr, n) detected nullptr");
@@ -1125,8 +1113,10 @@ public:
         return *this;
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(std::initializer_list<CharT> il) { return unchecked_assign(il.begin(), il.size()); }
-
+    QX_CONSTEXPR_CXX20 basic_inplace_string& unchecked_assign(std::initializer_list<CharT> il)
+    {
+        return unchecked_assign(il.begin(), il.size());
+    }
 
     // try_assign
 
@@ -1347,8 +1337,10 @@ public:
         return begin() + diff;
     }
 
-    QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, std::initializer_list<CharT> il) { return unchecked_insert(pos, il.begin(), il.ize()); }
-
+    QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, std::initializer_list<CharT> il)
+    {
+        return unchecked_insert(pos, il.begin(), il.ize());
+    }
 
     // try_insert
 
@@ -1430,8 +1422,11 @@ public:
         return begin() + diff;
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(const_iterator pos, std::initializer_list<CharT> il) { return try_insert(pos, il.begin(), il.size()); }
-    
+    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(const_iterator pos, std::initializer_list<CharT> il)
+    {
+        return try_insert(pos, il.begin(), il.size());
+    }
+
     // erase
 
     QX_CONSTEXPR_CXX20 basic_inplace_string& erase(size_type pos = 0, size_type n = npos)
@@ -2590,7 +2585,7 @@ basic_istream<CharT, Traits>& operator>>(basic_istream<CharT, Traits>& is, qx::b
     {
         streamsize const width = is.width();
         is.width(0); // reset unconditionally, regardless of what follows
- 
+
         try
         {
             str.clear();
@@ -2604,15 +2599,15 @@ basic_istream<CharT, Traits>& operator>>(basic_istream<CharT, Traits>& is, qx::b
                     state |= ios_base::eofbit;
                     break;
                 }
- 
+
                 CharT const ch = Traits::to_char_type(c);
                 if (ct.is(ctype_base::space, ch))
                     break;
- 
+
                 str.push_back(ch); // throws length_error if the word needs more than N chars
                 buf->sbumpc();
             }
- 
+
             if (str.empty())
                 state |= ios_base::failbit;
         }
@@ -2627,13 +2622,12 @@ basic_istream<CharT, Traits>& operator>>(basic_istream<CharT, Traits>& is, qx::b
                 is.exceptions(mask);
             }
             catch (...)
-            {
-            }
- 
+            {}
+
             if (mask & ios_base::badbit)
                 throw; // still resolves to the ORIGINAL exception, not the swallowed one above
         }
- 
+
         is.setstate(state);
     }
     else
