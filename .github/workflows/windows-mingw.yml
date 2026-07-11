@@ -20,43 +20,50 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup MinGW
-        uses: egor-tensin/setup-mingw@v2
+      - name: Setup MSYS2 / MinGW
+        uses: msys2/setup-msys2@v2
         with:
-          platform: x64
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
 
       - name: Show compiler version
+        shell: msys2 {0}
         run: |
           gcc --version
           g++ --version
 
       - name: Configure CMake (Debug)
-        run: >
-          cmake -B build-Debug -G Ninja
-          -DCMAKE_BUILD_TYPE=Debug
-          -DCMAKE_C_COMPILER=gcc
-          -DCMAKE_CXX_COMPILER=g++
-          -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }}
-          -DCMAKE_CXX_STANDARD_REQUIRED=ON
+        shell: msys2 {0}
+        run: |
+          cmake -B build-Debug -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON
 
       - name: Build Project (Debug)
+        shell: msys2 {0}
         run: cmake --build build-Debug --parallel
 
       - name: Run Tests (Debug)
+        shell: msys2 {0}
         run: ctest --test-dir build-Debug --output-on-failure --parallel
 
       - name: Configure CMake (Release)
-        run: >
-          cmake -B build-Release -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_C_COMPILER=gcc
-          -DCMAKE_CXX_COMPILER=g++
-          -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }}
-          -DCMAKE_CXX_STANDARD_REQUIRED=ON
+        shell: msys2 {0}
+        run: |
+          cmake -B build-Release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }} \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON
 
       - name: Build Project (Release)
+        shell: msys2 {0}
         run: cmake --build build-Release --parallel
 
       - name: Run Tests (Release)
+        shell: msys2 {0}
         run: ctest --test-dir build-Release --output-on-failure --parallel
-        
