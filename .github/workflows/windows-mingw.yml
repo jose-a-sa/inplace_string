@@ -1,0 +1,62 @@
+name: Windows MinGW Build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: windows-2022
+    name: MinGW | C++${{ matrix.cpp_std }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cpp_std: [17, 20]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MinGW
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64
+
+      - name: Show compiler version
+        run: |
+          gcc --version
+          g++ --version
+
+      - name: Configure CMake (Debug)
+        run: >
+          cmake -B build-Debug -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_CXX_COMPILER=g++
+          -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }}
+          -DCMAKE_CXX_STANDARD_REQUIRED=ON
+
+      - name: Build Project (Debug)
+        run: cmake --build build-Debug --parallel
+
+      - name: Run Tests (Debug)
+        run: ctest --test-dir build-Debug --output-on-failure --parallel
+
+      - name: Configure CMake (Release)
+        run: >
+          cmake -B build-Release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_CXX_COMPILER=g++
+          -DCMAKE_CXX_STANDARD=${{ matrix.cpp_std }}
+          -DCMAKE_CXX_STANDARD_REQUIRED=ON
+
+      - name: Build Project (Release)
+        run: cmake --build build-Release --parallel
+
+      - name: Run Tests (Release)
+        run: ctest --test-dir build-Release --output-on-failure --parallel
+        
