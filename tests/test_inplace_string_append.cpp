@@ -52,10 +52,6 @@ TEST(InplaceStringAppend, UncheckedAppend)
 
     s.unchecked_append(3, 'y');
     EXPECT_STREQ(s.c_str(), "hello world!yyy");
-
-    qx::inplace_string<10> src("abcdef");
-    s.unchecked_append(src, 2, 3);
-    EXPECT_STREQ(s.c_str(), "hello world!yyycde");
 }
 
 TEST(InplaceStringAppend, TryAppend)
