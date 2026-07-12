@@ -24,11 +24,11 @@ function(qx_register_component target name)
   set_target_properties(${target} PROPERTIES EXPORT_NAME ${name})
   add_library(${PROJECT_NAMESPACE}::${name} ALIAS ${target})
   install(TARGETS ${target}
-    EXPORT ${PROJECT_NAME}-${name}-targets
+    EXPORT "${PROJECT_NAME}-${name}-targets"
     FILE_SET HEADERS
     COMPONENT ${name}
   )
-  install(EXPORT ${PROJECT_NAME}-${name}-targets
+  install(EXPORT "${PROJECT_NAME}-${name}-targets"
     FILE "${PROJECT_NAME}-${name}-targets.cmake"
     NAMESPACE ${PROJECT_NAMESPACE}::
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"

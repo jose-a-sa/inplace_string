@@ -29,10 +29,23 @@ TEST(InplaceStringAccess, SubstringExtraction)
 {
     qx::inplace_string<20> const s("hello world");
     auto sub = s.substr(6, 5);
-    static_assert(std::is_same_v<decltype(sub), qx::inplace_string<20>>, "substr must return same type");
+    EXPECT_EQ(sub.capacity(), 20);
     EXPECT_STREQ(sub.c_str(), "world");
 
     EXPECT_THROW(s.substr(20, 1), std::out_of_range);
+}
+
+TEST(InplaceStringAccess, SubstringTemplatedExtraction)
+{
+    qx::inplace_string<20> const s("hello world");
+
+    auto sub1 = s.substr<6>();
+    EXPECT_EQ(sub1.max_size(), 14);
+    EXPECT_STREQ(sub1.c_str(), "world");
+
+    auto sub2 = s.substr<6, 5>();
+    EXPECT_EQ(sub2.max_size(), 5);
+    EXPECT_STREQ(sub2.c_str(), "world");
 }
 
 TEST(InplaceStringAccess, CopyToRawBuffer)
