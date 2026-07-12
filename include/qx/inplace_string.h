@@ -1634,6 +1634,22 @@ public:
         return basic_inplace_string(*this, pos, n);
     }
 
+    template <size_type Pos = 0, size_type Count = npos>
+    QX_CONSTEXPR_CXX20 auto substr() const noexcept -> basic_inplace_string<Count == npos ? (N - Pos) : Count, CharT, Traits>
+    {
+        static_assert(Pos <= N, "substr position out of range");
+        constexpr size_type kSubCapacity = Count == npos ? (N - Pos) : Count;
+        basic_inplace_string<kSubCapacity, value_type, traits_type> res;
+
+        size_type const sz = size();
+        if (Pos < sz)
+        {
+            size_type const n_copy = Count == npos ? sz - Pos : std::min(sz - Pos, Count);
+            res.unchecked_assign(data() + Pos, n_copy);
+        }
+        return res;
+    }
+
     QX_CONSTEXPR_CXX20 void swap(basic_inplace_string& other) noexcept
     {
         std::swap_ranges(rep_.data, rep_.data + N + 1, other.rep_.data);
