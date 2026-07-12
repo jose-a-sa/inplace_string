@@ -19,7 +19,7 @@ constexpr std::size_t kSSOSize = 15;
 constexpr std::size_t kEquivStackN = (((sizeof(std::string) + sizeof(void*) - 1) / sizeof(void*)) * sizeof(void*)) - 2;
 
 template <typename StringT>
-static void BM_InplaceStr_AssignSSO(benchmark::State& state)
+void BM_InplaceStr_AssignSSO(benchmark::State& state)
 {
     StringT s;
     for (auto _ : state)

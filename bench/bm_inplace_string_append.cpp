@@ -40,7 +40,8 @@ static void BM_InplaceStr_AppendRepeated(benchmark::State& state)
     for (auto _ : state)
     {
         StringT s;
-        for (int i = 0; i < 8; ++i)
+        s.reserve(254);
+        for (int i = 0; i < 24; ++i)
         {
             s.append(kRepeatedPayload.data(), kRepeatedPayload.size());
         }
