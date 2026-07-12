@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
-project(qxlib VERSION 0.1 LANGUAGES CXX)
+project(qxlib VERSION 1.0 LANGUAGES CXX)
 
 if(NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
@@ -12,28 +12,43 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+# ==============================================================================
+# Component Registration
+# ==============================================================================
+
 set(PROJECT_NAMESPACE qx)
 set(PROJECT_COMPONENTS)
 
-# ==============================================================================
-# Components
-# ==============================================================================
-add_library(inplace_string INTERFACE)
-add_library(${PROJECT_NAMESPACE}::inplace_string ALIAS inplace_string)
-target_compile_features(inplace_string INTERFACE cxx_std_17)
-list(APPEND PROJECT_COMPONENTS inplace_string)
+function(qx_register_component target name)
+  set_target_properties(${target} PROPERTIES EXPORT_NAME ${name})
+  add_library(${PROJECT_NAMESPACE}::${name} ALIAS ${target})
+  install(TARGETS ${target}
+    EXPORT ${PROJECT_NAME}-${name}-targets
+    FILE_SET HEADERS
+    COMPONENT ${name}
+  )
+  install(EXPORT ${PROJECT_NAME}-${name}-targets
+    FILE "${PROJECT_NAME}-${name}-targets.cmake"
+    NAMESPACE ${PROJECT_NAMESPACE}::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+    COMPONENT ${name}
+  )
+  set(PROJECT_COMPONENTS ${PROJECT_COMPONENTS} ${name} PARENT_SCOPE)
+endfunction()
 
-target_sources(inplace_string INTERFACE
-  FILE_SET HEADERS
-  BASE_DIRS "include"
-  FILES "include/qx/inplace_string.h"
-)
+# ==============================================================================
+# inplace_string
+# ==============================================================================
 
-install(TARGETS inplace_string
-  EXPORT ${PROJECT_NAME}-config
-  FILE_SET HEADERS
-  COMPONENT inplace_string
+add_library(qx_inplace_string INTERFACE)
+target_compile_features(qx_inplace_string INTERFACE cxx_std_17)
+target_sources(qx_inplace_string 
+  INTERFACE
+    FILE_SET HEADERS
+    BASE_DIRS "include"
+    FILES "include/qx/inplace_string.h"
 )
+qx_register_component(qx_inplace_string inplace_string)
 
 # ==============================================================================
 # Testing
@@ -86,35 +101,37 @@ endif()
 # ==============================================================================
 # Package Config
 # ==============================================================================
-install(
-  EXPORT "${PROJECT_NAME}-config"
-  FILE "${PROJECT_NAME}-targets.cmake"
-  NAMESPACE ${PROJECT_NAMESPACE}::
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
-)
-
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake.in" [=[
 @PACKAGE_INIT@
-include(CMakeFindDependencyMacro)
-include("${CMAKE_CURRENT_LIST_DIR}/${CMAKE_FIND_PACKAGE_NAME}-targets.cmake")
 
-set(_available_components @PACKAGE_COMPONENTS@)
+set(_supported_components @PROJECT_COMPONENTS@)
+
+if(${CMAKE_FIND_PACKAGE_NAME}_FIND_COMPONENTS)
+  set(_components ${${CMAKE_FIND_PACKAGE_NAME}_FIND_COMPONENTS})
+else()
+  set(_components ${_supported_components})
+endif()
+
 set(_found_components)
-foreach(_comp _available_components)
-  if(NOT TARGET @PROJECT_NS@::${_comp})
-    set(${CMAKE_FIND_PACKAGE_NAME}_${_comp}_FOUND FALSE)
-  else()
-    set(${CMAKE_FIND_PACKAGE_NAME}_${_comp}_FOUND TRUE)
-    list(APPEND _found_components "${_comp}")
+foreach(_comp IN LISTS _components)
+  if(NOT _comp IN_LIST _supported_components)
+    set(${CMAKE_FIND_PACKAGE_NAME}_FOUND FALSE)
+    set(${CMAKE_FIND_PACKAGE_NAME}_NOT_FOUND_MESSAGE "Unsupported component: ${_comp}")
+    return()
   endif()
+  include("${CMAKE_CURRENT_LIST_DIR}/${CMAKE_FIND_PACKAGE_NAME}-${_comp}-targets.cmake")
+  list(APPEND _found_components "${_comp}")
+  set(${CMAKE_FIND_PACKAGE_NAME}_${_comp}_FOUND TRUE)
 endforeach()
 
-check_required_components(@PROJECT_NAME@)
+unset(_supported_components)
+unset(_components)
+
+check_required_components(${CMAKE_FIND_PACKAGE_NAME})
 
 string(REPLACE ";" ", " _found_components "${_found_components}")
-message(STATUS "Found ${CMAKE_FIND_PACKAGE_NAME} ${${CMAKE_FIND_PACKAGE_NAME}_VERSION}: ${CMAKE_CURRENT_LIST_FILE} (found components: ${_found_components})")
+message(STATUS "Found ${CMAKE_FIND_PACKAGE_NAME} ${${CMAKE_FIND_PACKAGE_NAME}_VERSION} (${CMAKE_CURRENT_LIST_FILE}) [components: ${_found_components}]")
 unset(_found_components)
-unset(_available_components)
 ]=])
 
 configure_package_config_file(
