@@ -80,3 +80,22 @@ TEST(InplaceStringInsert, ExceptionsAndContracts)
         "contract violation"
     );
 }
+
+TEST(InplaceStringInsert, SelfReferentialMutations)
+{
+    qx::inplace_string<15> s1("abc");
+    s1.insert(1, s1); // Inserts "abc" at index 1 -> "aabcbc"
+    EXPECT_STREQ(s1.c_str(), "aabcbc");
+
+    qx::inplace_string<15> s2("abcdef");
+    s2.insert(2, s2, 1, 3); // Inserts "bcd" at index 2 -> "abbcdcdef"
+    EXPECT_STREQ(s2.c_str(), "abbcdcdef");
+
+    qx::inplace_string<15> s3("xyz");
+    EXPECT_NE(s3.try_insert(0, s3), nullptr);
+    EXPECT_STREQ(s3.c_str(), "xyzxyz");
+
+    qx::inplace_string<15> s4("123");
+    s4.unchecked_insert(3, s4);
+    EXPECT_STREQ(s4.c_str(), "123123");
+}

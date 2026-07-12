@@ -62,3 +62,58 @@ TEST(InplaceStringReplace, ExceptionsAndContracts)
         "contract violation"
     );
 }
+
+TEST(InplaceStringReplace, SelfReferentialAdditional)
+{
+    qx::inplace_string<32> s1("ABCDEF");
+    std::string_view sv(s1.data() + 1, 3); // points to "BCD"
+    s1.replace(2, 2, sv); // Replaces "CD" with "BCD" -> "ABBCDEF"
+    EXPECT_STREQ(s1.c_str(), "ABBCDEF");
+
+    qx::inplace_string<32> s2("012345");
+    s2.replace(1, 4, s2, 1, 4); // Replaces "1234" with "1234"
+    EXPECT_STREQ(s2.c_str(), "012345");
+
+    qx::inplace_string<32> s3("abcdefgh");
+    s3.replace(2, 3, s3, 4, 3); // Replaces "cde" with "efg"
+    EXPECT_STREQ(s3.c_str(), "abefgfgh");
+    
+    qx::inplace_string<32> s4("xyz");
+    s4.replace(1, 1, s4.data() + 2, 1); // Replaces 'y' with 'z' -> "xzz"
+    EXPECT_STREQ(s4.c_str(), "xzz");
+}
+
+TEST(InplaceStringReplace, SelfReferentialGrow)
+{
+    qx::inplace_string<32> s = "ABCDEFGH";
+    s.replace(0, 1, s, 3, 3); // replace "A" with substr(3,3) == "DEF"
+    EXPECT_STREQ(s.c_str(), "DEFBCDEFGH");
+}
+
+TEST(InplaceStringReplace, SelfReferentialGrowCorrupts)
+{
+    qx::inplace_string<32> s = "0123456789";
+    s.replace(2, 2, s, 5, 4); // replace "23" with substr(5,4) == "5678"
+    EXPECT_STREQ(s.c_str(), "015678456789"); // currently produces "015456456789"
+}
+
+TEST(InplaceStringReplace, SelfReferentialShrink)
+{
+    qx::inplace_string<32> s = "ABCDEFGH";
+    s.replace(1, 4, s, 6, 1); // replace "BCDE" with substr(6,1) == "G"
+    EXPECT_STREQ(s.c_str(), "AGFGH");
+}
+
+TEST(InplaceStringReplace, SelfReferentialEqualSize)
+{
+    qx::inplace_string<32> s = "ABCDEFGH";
+    s.replace(2, 2, s, 5, 2); // replace "CD" with substr(5,2) == "FG"
+    EXPECT_STREQ(s.c_str(), "ABFGEFGH");
+}
+
+TEST(InplaceStringReplace, SelfReferentialGrowSourceBeforePos)
+{
+    qx::inplace_string<32> s = "ABCDEFGH";
+    s.replace(4, 1, s, 0, 3); // replace "E" with substr(0,3) == "ABC"; source untouched by the shift
+    EXPECT_STREQ(s.c_str(), "ABCDABCFGH");
+}

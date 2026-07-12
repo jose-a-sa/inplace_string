@@ -730,12 +730,12 @@ public:
 
     constexpr const_reference operator[](size_type pos) const noexcept
     {
-        QX_ASSERT_CONTRACT(pos < size(), "inplace_string::operator[](pos): pos out of bounds");
+        QX_ASSERT_CONTRACT(pos <= size(), "inplace_string::operator[](pos): pos out of bounds");
         return rep_.data[pos];
     }
     constexpr reference operator[](size_type pos) noexcept
     {
-        QX_ASSERT_CONTRACT(pos < size(), "inplace_string::operator[](pos): pos out of bounds");
+        QX_ASSERT_CONTRACT(pos <= size(), "inplace_string::operator[](pos): pos out of bounds");
         return rep_.data[pos];
     }
 
@@ -1343,9 +1343,11 @@ public:
         return begin() + diff;
     }
 
-    QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, std::initializer_list<CharT> il)
+    QX_CONSTEXPR_CXX20 iterator unchecked_insert(const_iterator pos, std::initializer_list<CharT> il) noexcept
     {
-        return unchecked_insert(pos, il.begin(), il.ize());
+        difference_type diff = pos - begin();
+        unchecked_insert(static_cast<size_type>(diff), il.begin(), il.size());
+        return begin() + diff;
     }
 
     // try_insert
@@ -1423,14 +1425,17 @@ public:
     QX_CONSTEXPR_CXX20 std::optional<iterator> try_insert(const_iterator pos, size_type n, CharT c) noexcept
     {
         difference_type diff = pos - begin();
-        if (!try_insert(static_cast<size_type>(diff), n, c))
-            return std::nullopt;
-        return begin() + diff;
+        if (try_insert(static_cast<size_type>(diff), n, c))
+            return begin() + diff;
+        return std::nullopt;
     }
 
-    QX_CONSTEXPR_CXX20 basic_inplace_string* try_insert(const_iterator pos, std::initializer_list<CharT> il)
+    QX_CONSTEXPR_CXX20 std::optional<iterator> try_insert(const_iterator pos, std::initializer_list<CharT> il) noexcept
     {
-        return try_insert(pos, il.begin(), il.size());
+        difference_type diff = pos - begin();
+        if(try_insert(diff, il.begin(), il.size()))
+            return begin() + diff;
+        return std::nullopt;
     }
 
     // erase
@@ -1539,8 +1544,11 @@ public:
             if (n_move != 0)
                 traits_type::move(dst + n2, dst + n1, n_move);
         }
-        else
+        else // n2 > n1
         {
+            if (intl::is_pointer_in_range(dst + n1, ptr + sz, str))
+                str += (n2 - n1);
+
             size_type const n_move = sz - pos - n1;
             if (n_move != 0)
                 traits_type::move(dst + n2, dst + n1, n_move);
@@ -1658,7 +1666,8 @@ public:
 
     QX_CONSTEXPR_CXX20 void swap(basic_inplace_string& other) noexcept
     {
-        std::swap_ranges(rep_.data, rep_.data + N + 1, other.rep_.data);
+        size_type const n = std::max(size(), other.size()) + 1;
+        std::swap_ranges(rep_.data, rep_.data + n, other.rep_.data);
         std::swap(rep_.size, other.rep_.size);
     }
 
