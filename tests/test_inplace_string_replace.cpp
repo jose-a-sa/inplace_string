@@ -117,3 +117,37 @@ TEST(InplaceStringReplace, SelfReferentialGrowSourceBeforePos)
     s.replace(4, 1, s, 0, 3); // replace "E" with substr(0,3) == "ABC"; source untouched by the shift
     EXPECT_STREQ(s.c_str(), "ABCDABCFGH");
 }
+
+TEST(InplaceStringReplace, ReplacePosCountChar)
+{
+    qx::inplace_string<20> s("hello world");
+    
+    // replace(pos, n1, n2, c)
+    s.replace(6, 5, 4, 'X'); // replace 5 chars ("world") with 4 'X's
+    EXPECT_STREQ(s.c_str(), "hello XXXX");
+    
+    // replace expanding
+    s.replace(0, 5, 6, 'Y'); // replace "hello" with "YYYYYY"
+    EXPECT_STREQ(s.c_str(), "YYYYYY XXXX");
+}
+
+TEST(InplaceStringReplace, ReplaceIteratorWithPointersAndList)
+{
+    qx::inplace_string<20> s("abcdef");
+    
+    // replace(it1, it2, ptr, n)
+    s.replace(s.begin() + 1, s.begin() + 3, "XYZW", 3); // "bc" -> "XYZ"
+    EXPECT_STREQ(s.c_str(), "aXYZdef");
+
+    // replace(it1, it2, ptr)
+    s.replace(s.begin() + 1, s.begin() + 4, "B"); // "XYZ" -> "B"
+    EXPECT_STREQ(s.c_str(), "aBdef");
+
+    // replace(it1, it2, initializer_list)
+    s.replace(s.begin() + 1, s.begin() + 2, {'1', '2'}); // "B" -> "12"
+    EXPECT_STREQ(s.c_str(), "a12def");
+    
+    // replace(it1, it2, n, c)
+    s.replace(s.begin() + 1, s.begin() + 3, 3, '9'); // "12" -> "999"
+    EXPECT_STREQ(s.c_str(), "a999def");
+}

@@ -99,3 +99,65 @@ TEST(InplaceStringInsert, SelfReferentialMutations)
     s4.unchecked_insert(3, s4);
     EXPECT_STREQ(s4.c_str(), "123123");
 }
+
+TEST(InplaceStringInsert, IteratorCharacterInsert)
+{
+    qx::inplace_string<10> s("ac");
+    
+    // insert(const_iterator, c)
+    auto it1 = s.insert(s.begin() + 1, 'b');
+    EXPECT_EQ(*it1, 'b');
+    EXPECT_STREQ(s.c_str(), "abc");
+
+    // insert(const_iterator, n, c)
+    auto it2 = s.insert(s.begin() + 3, 2, 'X');
+    EXPECT_EQ(*it2, 'X');
+    EXPECT_STREQ(s.c_str(), "abcXX");
+}
+
+TEST(InplaceStringInsert, UncheckedIteratorInsert)
+{
+    qx::inplace_string<10> s("14");
+    
+    // unchecked_insert(const_iterator, c)
+    auto it1 = s.unchecked_insert(s.begin() + 1, '2');
+    EXPECT_EQ(*it1, '2');
+    EXPECT_STREQ(s.c_str(), "124");
+
+    // unchecked_insert(const_iterator, n, c)
+    auto it2 = s.unchecked_insert(s.begin() + 2, 1, '3');
+    EXPECT_EQ(*it2, '3');
+    EXPECT_STREQ(s.c_str(), "1234");
+    
+    // unchecked_insert(const_iterator, initializer_list)
+    auto it3 = s.unchecked_insert(s.end(), {'5', '6'});
+    EXPECT_EQ(*it3, '5');
+    EXPECT_STREQ(s.c_str(), "123456");
+}
+
+TEST(InplaceStringInsert, TryInsertOptionalIterators)
+{
+    qx::inplace_string<10> s("abc");
+    
+    // try_insert(const_iterator, c) -> returns std::optional<iterator>
+    auto opt_it = s.try_insert(s.begin() + 1, 'X');
+    ASSERT_TRUE(opt_it.has_value());
+    EXPECT_EQ(**opt_it, 'X');
+    EXPECT_STREQ(s.c_str(), "aXbc");
+
+    // try_insert(const_iterator, n, c) -> returns std::optional<iterator>
+    auto opt_it2 = s.try_insert(s.begin() + 4, 2, 'Y');
+    ASSERT_TRUE(opt_it2.has_value());
+    EXPECT_STREQ(s.c_str(), "aXbcYY");
+    
+    // try_insert(const_iterator, initializer_list)
+    auto opt_it3 = s.try_insert(s.end(), {'Z'});
+    ASSERT_TRUE(opt_it3.has_value());
+    EXPECT_STREQ(s.c_str(), "aXbcYYZ");
+
+    // Capacity failure returns nullopt
+    qx::inplace_string<3> full("123");
+    EXPECT_FALSE(full.try_insert(full.begin(), 'X').has_value());
+    EXPECT_FALSE(full.try_insert(full.begin(), 1, 'X').has_value());
+    EXPECT_FALSE(full.try_insert(full.begin(), {'X'}).has_value());
+}

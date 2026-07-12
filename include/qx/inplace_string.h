@@ -1206,9 +1206,9 @@ public:
 
         if (n > 0)
         {
-            pointer ptr = data();
-            size_type n_move = sz - pos;
-            if (n_move != 0)
+            pointer const ptr = data();
+            size_type const n_move = sz - pos;
+            if (n_move > 0)
             {
                 if (intl::is_pointer_in_range(ptr + pos, ptr + sz, str))
                     str += n;
@@ -1238,12 +1238,12 @@ public:
             if (n > capacity() - sz)
                 throw_length_error();
 
-            pointer p = data();
-            size_type n_move = sz - pos;
-            if (n_move != 0)
-                traits_type::move(p + pos + n, p + pos, n_move);
+            pointer const ptr = data();
+            size_type const n_move = sz - pos;
+            if (n_move > 0)
+                traits_type::move(ptr + pos + n, ptr + pos, n_move);
 
-            traits_type::assign(p + pos, n, c);
+            traits_type::assign(ptr + pos, n, c);
             sz += n;
             set_size_and_null_terminate(sz);
         }
@@ -1297,9 +1297,9 @@ public:
         if (n > 0)
         {
             size_type sz = size();
-            pointer ptr = data();
-            size_type n_move = sz - pos;
-            if (n_move != 0)
+            pointer const ptr = data();
+            size_type const n_move = sz - pos;
+            if (n_move > 0)
             {
                 if (intl::is_pointer_in_range(ptr + pos, ptr + sz, str))
                     str += n;
@@ -1323,11 +1323,11 @@ public:
         if (n > 0)
         {
             size_type sz = size();
-            pointer p = data();
-            size_type n_move = sz - pos;
-            if (n_move != 0)
-                traits_type::move(p + pos + n, p + pos, n_move);
-            traits_type::assign(p + pos, n, c);
+            pointer const ptr = data();
+            size_type const n_move = sz - pos;
+            if (n_move > 0)
+                traits_type::move(ptr + pos + n, ptr + pos, n_move);
+            traits_type::assign(ptr + pos, n, c);
             sz += n;
             set_size_and_null_terminate(sz);
         }
@@ -1376,9 +1376,9 @@ public:
             if (n > capacity() - sz)
                 return nullptr;
 
-            pointer ptr = data();
-            size_type n_move = sz - pos;
-            if (n_move != 0)
+            pointer const ptr = data();
+            size_type const n_move = sz - pos;
+            if (n_move > 0)
             {
                 if (intl::is_pointer_in_range(ptr + pos, ptr + sz, str))
                     str += n;
@@ -1408,12 +1408,12 @@ public:
             if (n > capacity() - sz)
                 return nullptr;
 
-            pointer p = data();
-            size_type n_move = sz - pos;
-            if (n_move != 0)
-                traits_type::move(p + pos + n, p + pos, n_move);
+            pointer const ptr = data();
+            size_type const n_move = sz - pos;
+            if (n_move > 0)
+                traits_type::move(ptr + pos + n, ptr + pos, n_move);
 
-            traits_type::assign(p + pos, n, c);
+            traits_type::assign(ptr + pos, n, c);
             sz += n;
             set_size_and_null_terminate(sz);
         }
@@ -1433,7 +1433,7 @@ public:
     QX_CONSTEXPR_CXX20 std::optional<iterator> try_insert(const_iterator pos, std::initializer_list<CharT> il) noexcept
     {
         difference_type diff = pos - begin();
-        if(try_insert(diff, il.begin(), il.size()))
+        if (try_insert(diff, il.begin(), il.size()))
             return begin() + diff;
         return std::nullopt;
     }
@@ -1456,8 +1456,8 @@ public:
             size_type const sz = size();
             pointer const ptr = data();
             n = std::min(n, sz - pos);
-            size_type n_move = sz - pos - n;
-            if (n_move != 0)
+            size_type const n_move = sz - pos - n;
+            if (n_move > 0)
                 traits_type::move(ptr + pos, ptr + pos + n, n_move);
             set_size_and_null_terminate(sz - n);
         }
@@ -1531,28 +1531,27 @@ public:
 
         pointer const ptr = data();
         pointer const dst = ptr + pos;
-        if (n2 == n1)
+
+        if (n1 == n2)
         {
             traits_type::move(dst, str, n2);
         }
         else if (n2 < n1)
         {
+            size_type const n_move = sz - pos - n1;
             if (n2 > 0)
                 traits_type::move(dst, str, n2);
-
-            size_type const n_move = sz - pos - n1;
-            if (n_move != 0)
+            if (n_move > 0)
                 traits_type::move(dst + n2, dst + n1, n_move);
         }
-        else // n2 > n1
+        else // (n2 > n1)
         {
             if (intl::is_pointer_in_range(dst + n1, ptr + sz, str))
                 str += (n2 - n1);
 
             size_type const n_move = sz - pos - n1;
-            if (n_move != 0)
+            if (n_move > 0)
                 traits_type::move(dst + n2, dst + n1, n_move);
-
             if (n2 > 0)
                 traits_type::move(dst, str, n2);
         }
@@ -1578,11 +1577,11 @@ public:
         if (new_size > capacity())
             throw_length_error();
 
-        pointer ptr = data();
+        pointer const ptr = data();
         if (n1 != n2)
         {
-            size_type n_move = sz - pos - n1;
-            if (n_move != 0)
+            size_type const n_move = sz - pos - n1;
+            if (n_move > 0)
                 traits_type::move(ptr + pos + n2, ptr + pos + n1, n_move);
         }
 
@@ -2242,10 +2241,10 @@ private:
         size_type sz = size();
         if (n > capacity() - sz)
             throw_length_error();
-        pointer ptr = data();
+        pointer const ptr = data();
 
-        size_type n_move = sz - ip;
-        if (n_move != 0)
+        size_type const n_move = sz - ip;
+        if (n_move > 0)
             traits_type::move(ptr + ip + n, ptr + ip, n_move);
 
         sz += n;
@@ -2571,9 +2570,9 @@ auto to_inplace_string(T val) noexcept
         : 4 + std::numeric_limits<T>::max_digits10 + std::max(2, intl::max_exponent_digits10_v<T>);
 
     using SizeT = intl::min_size_t<kRequiredN>;
-    using ReqStrT = inplace_string<kRequiredN>;
+    using RequiredStringT = inplace_string<kRequiredN>;
     static constexpr std::size_t kSizeSize = std::max(sizeof(SizeT), sizeof(char));
-    static constexpr std::size_t kOptimalN = ((sizeof(ReqStrT) - kSizeSize) / sizeof(char)) - 1;
+    static constexpr std::size_t kOptimalN = ((sizeof(RequiredStringT) - kSizeSize) / sizeof(char)) - 1;
 
     return unchecked_to_inplace_string<kOptimalN>(val);
 }
