@@ -4,9 +4,11 @@ project(qxlib VERSION 1.0 LANGUAGES CXX)
 if(NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
+
 if(NOT DEFINED CMAKE_CXX_EXTENSIONS)
   set(CMAKE_CXX_EXTENSIONS OFF)
 endif()
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(GNUInstallDirs)
@@ -15,7 +17,6 @@ include(CMakePackageConfigHelpers)
 # ==============================================================================
 # Component Registration
 # ==============================================================================
-
 set(PROJECT_NAMESPACE qx)
 set(PROJECT_COMPONENTS)
 
@@ -39,63 +40,31 @@ endfunction()
 # ==============================================================================
 # inplace_string
 # ==============================================================================
-
 add_library(qx_inplace_string INTERFACE)
 target_compile_features(qx_inplace_string INTERFACE cxx_std_17)
-target_sources(qx_inplace_string 
+target_sources(qx_inplace_string
   INTERFACE
-    FILE_SET HEADERS
-    BASE_DIRS "include"
-    FILES "include/qx/inplace_string.h"
+  FILE_SET HEADERS
+  BASE_DIRS "include"
+  FILES "include/qx/inplace_string.h"
 )
 qx_register_component(qx_inplace_string inplace_string)
 
 # ==============================================================================
-# Testing
+# Testing & Benchmark
 # ==============================================================================
 option(QX_BUILD_TESTS "Build tests for qxlib" ${PROJECT_IS_TOP_LEVEL})
 
 if(QX_BUILD_TESTS)
   enable_testing()
-  include(GoogleTest)
-  include(FetchContent)
+  add_subdirectory(tests)
+endif()
 
-  FetchContent_Declare(fmtlib
-    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-    GIT_TAG 12.1.0
-  )
-  set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
-  # FetchContent_MakeAvailable(fmtlib)
+option(QX_BUILD_BENCHMARKS "Build benchmarks for qxlib" ${PROJECT_IS_TOP_LEVEL})
 
-  FetchContent_Declare(googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.17.0
-  )
-
-  set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-  FetchContent_MakeAvailable(googletest)
-
-  file(GLOB_RECURSE _tests CONFIGURE_DEPENDS "tests/*.cpp")
-
-  foreach(_test_file IN LISTS _tests)
-    get_filename_component(_test_name "${_test_file}" NAME_WE)
-    add_executable(${_test_name} "${_test_file}")
-    target_include_directories(${_test_name} PRIVATE
-      "${CMAKE_CURRENT_SOURCE_DIR}/tests"
-    )
-    target_link_libraries(${_test_name} PRIVATE
-      GTest::gmock_main
-      # fmt::fmt
-      ${PROJECT_NAMESPACE}::inplace_string
-    )
-    target_compile_definitions(${_test_name} PRIVATE
-      QX_HARDENING_MODE=QX_HARDENING_MODE_ALL
-      QX_ASSERT_MODE=QX_ASSERT_MODE_LOG_TRAP
-    )
-    gtest_discover_tests(${_test_name})
-  endforeach()
-
-  unset(_tests)
+if(QX_BUILD_BENCHMARKS)
+  enable_testing()
+  add_subdirectory(bench)
 endif()
 
 # ==============================================================================
