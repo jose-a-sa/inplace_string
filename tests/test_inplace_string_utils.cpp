@@ -87,3 +87,18 @@ TEST(InplaceStringUtils, ToStringView)
     auto const sv = std::string_view{s};
     EXPECT_EQ(sv, std::string_view("abc"));
 }
+
+TEST(InplaceStringHash, StdHashSpecialization)
+{
+    qx::inplace_string<20> const s("hash_me");
+    std::string_view const sv("hash_me");
+
+    std::hash<qx::inplace_string<20>> inplace_hasher;
+    std::hash<std::string_view> view_hasher;
+
+    // The hash of the inplace_string should exactly match the string_view hash
+    EXPECT_EQ(inplace_hasher(s), view_hasher(sv));
+    
+    qx::inplace_string<20> const s2("different");
+    EXPECT_NE(inplace_hasher(s), inplace_hasher(s2));
+}

@@ -72,3 +72,38 @@ TEST(InplaceStringCompare, ExceptionsAndContracts)
         "contract violation"
     );
 }
+
+#if __cplusplus > 202002L
+
+TEST(InplaceStringQueries, StartsWith)
+{
+    qx::inplace_string<20> const s("hello world");
+    EXPECT_TRUE(s.starts_with("hello"));
+    EXPECT_TRUE(s.starts_with('h'));
+    EXPECT_FALSE(s.starts_with("world"));
+    EXPECT_FALSE(s.starts_with('e'));
+}
+
+TEST(InplaceStringQueries, EndsWith)
+{
+    qx::inplace_string<20> const s("hello world");
+    EXPECT_TRUE(s.ends_with("world"));
+    EXPECT_TRUE(s.ends_with('d'));
+    EXPECT_FALSE(s.ends_with("hello"));
+    EXPECT_FALSE(s.ends_with('l'));
+}
+
+#endif
+
+#if __cplusplus > 202302L
+
+TEST(InplaceStringQueries, Contains)
+{
+    qx::inplace_string<20> const s("hello world");
+    EXPECT_TRUE(s.contains("lo wo"));
+    EXPECT_TRUE(s.contains(' '));
+    EXPECT_FALSE(s.contains("planet"));
+    EXPECT_FALSE(s.contains('z'));
+}
+
+#endif
