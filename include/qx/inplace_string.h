@@ -659,7 +659,7 @@ public:
     constexpr basic_inplace_string& operator=(CharT c)
     {
         if (capacity() == 0)
-            throw_length_error();
+            throw_out_of_capacity();
         traits_type::assign(*data(), c);
         set_size_and_null_terminate(1);
         return *this;
@@ -692,10 +692,10 @@ public:
     void resize(size_type n, CharT c)
     {
         if (n > max_size())
-            throw_length_error();
+            throw_out_of_capacity();
 
         if (n > size())
-            append(n - size(), c);
+            unchecked_append(n - size(), c);
         else
             erase_to_end(n);
     }
@@ -708,7 +708,7 @@ public:
         using result_type = decltype(std::move(op)(data(), n));
         static_assert(std::is_integral_v<result_type>, "Operation return type must be integer-like");
         if (n > capacity())
-            throw_length_error();
+            throw_out_of_capacity();
 
         set_size_and_null_terminate(n);
         erase_to_end(std::move(op)(data(), n));
@@ -718,7 +718,7 @@ public:
     void reserve(size_type n)
     {
         if (n > max_size())
-            throw_length_error();
+            throw_out_of_capacity();
     }
 
     // ReSharper disable once CppMemberFunctionMayBeStatic
@@ -802,7 +802,7 @@ public:
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::append(ptr, n) detected nullptr");
         size_type const sz = size();
         if (n > capacity() - sz)
-            throw_length_error();
+            throw_out_of_capacity();
 
         if (n > 0)
         {
@@ -825,7 +825,7 @@ public:
         {
             size_type const sz = size();
             if (n > capacity() - sz)
-                throw_length_error();
+                throw_out_of_capacity();
             pointer end = data() + sz;
             traits_type::assign(end, n, c);
             set_size_and_null_terminate(n + sz);
@@ -846,7 +846,7 @@ public:
             if (intl::is_trivial_contiguous_iterator_v<Iterator> && !address_in_range(*first))
             {
                 if (n > capacity() - sz)
-                    throw_length_error();
+                    throw_out_of_capacity();
                 copy_non_overlapping_range(first, last, data() + sz);
                 set_size_and_null_terminate(sz + n);
                 return *this;
@@ -970,7 +970,7 @@ public:
     QX_CONSTEXPR_CXX20 basic_inplace_string& push_back(CharT c)
     {
         if (size() == capacity())
-            throw_length_error();
+            throw_out_of_capacity();
         return unchecked_push_back(c);
     }
 
@@ -1050,7 +1050,7 @@ public:
     {
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::assign(ptr, n) detected nullptr");
         if (n > capacity())
-            throw_length_error();
+            throw_out_of_capacity();
         traits_type::move(data(), str, n);
         set_size_and_null_terminate(n);
         return *this;
@@ -1065,7 +1065,7 @@ public:
     QX_CONSTEXPR_CXX20 basic_inplace_string& assign(size_type n, CharT c)
     {
         if (n > capacity())
-            throw_length_error();
+            throw_out_of_capacity();
         traits_type::assign(data(), n, c);
         set_size_and_null_terminate(n);
         return *this;
@@ -1202,7 +1202,7 @@ public:
         if (pos > sz)
             throw_out_of_range();
         if (n > capacity() - sz)
-            throw_length_error();
+            throw_out_of_capacity();
 
         if (n > 0)
         {
@@ -1236,7 +1236,7 @@ public:
         if (n > 0)
         {
             if (n > capacity() - sz)
-                throw_length_error();
+                throw_out_of_capacity();
 
             pointer const ptr = data();
             size_type const n_move = sz - pos;
@@ -1527,7 +1527,7 @@ public:
         n1 = std::min(n1, sz - pos);
         size_type const new_size = sz - n1 + n2;
         if (new_size > capacity())
-            throw_length_error();
+            throw_out_of_capacity();
 
         pointer const ptr = data();
         pointer const dst = ptr + pos;
@@ -1575,7 +1575,7 @@ public:
         n1 = std::min(n1, sz - pos);
         size_type const new_size = sz - n1 + n2;
         if (new_size > capacity())
-            throw_length_error();
+            throw_out_of_capacity();
 
         pointer const ptr = data();
         if (n1 != n2)
@@ -2111,7 +2111,7 @@ private:
 
     [[noreturn]] static QX_COLD_NOINLINE void throw_out_of_range() { throw std::out_of_range{"basic_inplace_string"}; }
 
-    [[noreturn]] static QX_COLD_NOINLINE void throw_length_error() { throw std::length_error{"basic_inplace_string"}; }
+    [[noreturn]] static QX_COLD_NOINLINE void throw_out_of_capacity() { throw std::length_error{"basic_inplace_string"}; }
 
     // size and null termination as single operation
 
@@ -2126,7 +2126,7 @@ private:
     QX_CONSTEXPR_CXX20 void init(value_type const* str, size_type n)
     {
         if (n > max_size())
-            throw_length_error();
+            throw_out_of_capacity();
         traits_type::copy(data(), str, n);
         set_size_and_null_terminate(n);
     }
@@ -2134,7 +2134,7 @@ private:
     QX_CONSTEXPR_CXX20 void init(size_type n, value_type c)
     {
         if (n > max_size())
-            throw_length_error();
+            throw_out_of_capacity();
         traits_type::assign(data(), n, c);
         set_size_and_null_terminate(n);
     }
@@ -2169,7 +2169,7 @@ private:
 
         auto const n = static_cast<size_type>(std::distance(first, last));
         if (n > capacity())
-            throw_length_error();
+            throw_out_of_capacity();
 
         const_pointer const src = intl::to_address(first);
         pointer const ptr = data();
@@ -2202,7 +2202,7 @@ private:
     QX_CONSTEXPR_CXX20 void init_with_size(Iterator first, Sentinel last, size_type sz)
     {
         if (sz > max_size())
-            throw_length_error();
+            throw_out_of_capacity();
 
         // strong exception guarantee: the string is left in a valid empty state if throws during initialization
         try
@@ -2240,7 +2240,7 @@ private:
     {
         size_type sz = size();
         if (n > capacity() - sz)
-            throw_length_error();
+            throw_out_of_capacity();
         pointer const ptr = data();
 
         size_type const n_move = sz - ip;
@@ -2557,7 +2557,7 @@ inplace_string<N> to_inplace_string(T val)
     auto const begin = res.data();
     auto const [end, ec] = std::to_chars(begin, begin + N, val);
     if (ec != std::errc())
-        inplace_string<N>::throw_length_error();
+        inplace_string<N>::throw_out_of_capacity();
     res.set_size_and_null_terminate(static_cast<std::size_t>(end - begin));
     return res;
 }
