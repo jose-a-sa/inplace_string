@@ -116,3 +116,25 @@ TEST(InplaceStringAssign, ExceptionsAndContracts)
         "contract violation"
     );
 }
+
+TEST(InplaceStringAssign, SelfReferentialMutations)
+{
+    // Try assign with itself
+    qx::inplace_string<15> s1("abc");
+    EXPECT_NE(s1.try_assign(s1), nullptr);
+    EXPECT_STREQ(s1.c_str(), "abc");
+
+    // Unchecked assign with itself
+    s1.unchecked_assign(s1);
+    EXPECT_STREQ(s1.c_str(), "abc");
+
+    // Assigning a raw pointer pointing into its own buffer (shrinking)
+    qx::inplace_string<15> s2("abcdef");
+    s2.assign(s2.data() + 2, 3); // Assigns "cde"
+    EXPECT_STREQ(s2.c_str(), "cde");
+
+    // Unchecked assignment from an internal pointer
+    qx::inplace_string<15> s3("abcdef");
+    s3.unchecked_assign(s3.data() + 1, 4); // Assigns "bcde"
+    EXPECT_STREQ(s3.c_str(), "bcde");
+}

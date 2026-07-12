@@ -119,3 +119,31 @@ TEST(InplaceStringAppend, ExceptionsAndContracts)
         "contract violation"
     );
 }
+
+TEST(InplaceStringAppend, SelfReferentialMutations)
+{
+    // Full self-appending (s.append(s))
+    qx::inplace_string<20> s1("abc");
+    s1.append(s1);
+    EXPECT_STREQ(s1.c_str(), "abcabc");
+
+    // Substring self-appending (s.append(s, pos, count))
+    qx::inplace_string<20> s2("abcdef");
+    s2.append(s2, 1, 3); // Appends "bcd"
+    EXPECT_STREQ(s2.c_str(), "abcdefbcd");
+
+    // Unchecked self-appending
+    qx::inplace_string<20> s3("xyz");
+    s3.unchecked_append(s3);
+    EXPECT_STREQ(s3.c_str(), "xyzxyz");
+
+    // Try self-appending
+    qx::inplace_string<20> s4("123");
+    EXPECT_NE(s4.try_append(s4), nullptr);
+    EXPECT_STREQ(s4.c_str(), "123123");
+
+    // Appending a raw pointer pointing inside its own internal buffer
+    qx::inplace_string<20> s5("hello");
+    s5.append(s5.data() + 1, 3); // Appends "ell"
+    EXPECT_STREQ(s5.c_str(), "helloell");
+}
