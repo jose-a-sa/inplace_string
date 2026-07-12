@@ -2577,6 +2577,73 @@ auto to_inplace_string(T val) noexcept
     return unchecked_to_inplace_string<kOptimalN>(val);
 }
 
+template <class CharT, class Traits, std::size_t N>
+std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& os, basic_inplace_string<N, CharT, Traits> const& str)
+{
+    return os << std::basic_string_view<CharT, Traits>(str);
+}
+
+template <class CharT, class Traits, std::size_t N>
+std::basic_istream<CharT, Traits>& operator>>(std::basic_istream<CharT, Traits>& is, basic_inplace_string<N, CharT, Traits>& str)
+{
+    std::ios_base::iostate state = std::ios_base::goodbit;
+    typename std::basic_istream<CharT, Traits>::sentry sentry(is);
+    if (sentry)
+    {
+        std::streamsize const width = is.width();
+        is.width(0); // reset unconditionally, regardless of what follows
+
+        try
+        {
+            str.clear();
+            auto const& ct = std::use_facet<std::ctype<CharT>>(is.getloc());
+            auto* buf = is.rdbuf();
+            while (width <= 0 || static_cast<std::streamsize>(str.size()) < width)
+            {
+                auto const c = buf->sgetc();
+                if (Traits::eq_int_type(c, Traits::eof()))
+                {
+                    state |= std::ios_base::eofbit;
+                    break;
+                }
+
+                CharT const ch = Traits::to_char_type(c);
+                if (ct.is(std::ctype_base::space, ch))
+                    break;
+
+                str.push_back(ch); // throws length_error if the word needs more than N chars
+                buf->sbumpc();
+            }
+
+            if (str.empty())
+                state |= std::ios_base::failbit;
+        }
+        catch (...)
+        {
+            state |= std::ios_base::badbit;
+            auto const mask = is.exceptions();
+            try
+            {
+                is.exceptions(std::ios_base::goodbit);
+                is.setstate(state);
+                is.exceptions(mask);
+            }
+            catch (...)
+            {}
+
+            if (mask & std::ios_base::badbit)
+                throw; // still resolves to the ORIGINAL exception, not the swallowed one above
+        }
+
+        is.setstate(state);
+    }
+    else
+    {
+        is.setstate(std::ios_base::failbit);
+    }
+    return is;
+}
+
 } // namespace qx
 
 namespace std
@@ -2599,72 +2666,5 @@ struct hash<qx::basic_inplace_string<N, char32_t>> : hash<basic_string_view<char
 template <std::size_t N>
 struct hash<qx::basic_inplace_string<N, wchar_t>> : hash<basic_string_view<wchar_t>>
 {};
-
-template <class CharT, class Traits, std::size_t N>
-basic_ostream<CharT, Traits>& operator<<(basic_ostream<CharT, Traits>& os, qx::basic_inplace_string<N, CharT, Traits> const& str)
-{
-    return os << std::basic_string_view<CharT, Traits>(str);
-}
-
-template <class CharT, class Traits, std::size_t N>
-basic_istream<CharT, Traits>& operator>>(basic_istream<CharT, Traits>& is, qx::basic_inplace_string<N, CharT, Traits>& str)
-{
-    ios_base::iostate state = ios_base::goodbit;
-    typename basic_istream<CharT, Traits>::sentry sentry(is);
-    if (sentry)
-    {
-        streamsize const width = is.width();
-        is.width(0); // reset unconditionally, regardless of what follows
-
-        try
-        {
-            str.clear();
-            auto const& ct = use_facet<ctype<CharT>>(is.getloc());
-            auto* buf = is.rdbuf();
-            while (width <= 0 || static_cast<streamsize>(str.size()) < width)
-            {
-                auto const c = buf->sgetc();
-                if (Traits::eq_int_type(c, Traits::eof()))
-                {
-                    state |= ios_base::eofbit;
-                    break;
-                }
-
-                CharT const ch = Traits::to_char_type(c);
-                if (ct.is(ctype_base::space, ch))
-                    break;
-
-                str.push_back(ch); // throws length_error if the word needs more than N chars
-                buf->sbumpc();
-            }
-
-            if (str.empty())
-                state |= ios_base::failbit;
-        }
-        catch (...)
-        {
-            state |= ios_base::badbit;
-            auto const mask = is.exceptions();
-            try
-            {
-                is.exceptions(ios_base::goodbit);
-                is.setstate(state);
-                is.exceptions(mask);
-            }
-            catch (...)
-            {}
-
-            if (mask & ios_base::badbit)
-                throw; // still resolves to the ORIGINAL exception, not the swallowed one above
-        }
-
-        is.setstate(state);
-    }
-    else
-    {
-        is.setstate(ios_base::failbit);
-    }
-    return is;
-}
 
 } // namespace std
