@@ -1,6 +1,7 @@
 #include <benchmark/benchmark.h>
 
 #include <array>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -12,12 +13,13 @@ namespace
 
 #ifdef QX_STL_LIBCPP
 constexpr std::string_view kSSOPayload = "123456789012345678901";
-constexpr std::size_t kEquivStackN = 22;
+constexpr std::size_t kSSOSize = 22;
 #else
 constexpr std::string_view kSSOPayload = "12345678901234";
-constexpr std::size_t kEquivStackN = 30;
+constexpr std::size_t kSSOSize = 15;
 #endif
 
+constexpr std::size_t kEquivStackN = (((sizeof(std::string) + sizeof(void*) - 1) / sizeof(void*)) * sizeof(void*)) - 2;
 constexpr std::string_view kMediumPayload = "hello darkness my old friend, I have come to talk with you again";
 
 template <class StringT>
@@ -72,32 +74,6 @@ static void BM_CopyFromStringTSSO(benchmark::State& state)
 
 BENCHMARK_TEMPLATE(BM_CopyFromStringTSSO, std::string);
 BENCHMARK_TEMPLATE(BM_CopyFromStringTSSO, qx::inplace_string<kEquivStackN>);
-
-template <class StringT>
-static void BM_InplaceStr_InitFromCStrMediumPayload(benchmark::State& state)
-{
-    for (auto _ : state)
-    {
-        StringT s(kMediumPayload.data());
-        benchmark::DoNotOptimize(s);
-    }
-}
-
-BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromCStrMediumPayload, std::string);
-BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromCStrMediumPayload, qx::inplace_string<126>);
-
-template <class StringT>
-static void BM_InplaceStr_InitFromCStrSizedMediumPayload(benchmark::State& state)
-{
-    for (auto _ : state)
-    {
-        StringT s(kMediumPayload.data(), kMediumPayload.size());
-        benchmark::DoNotOptimize(s);
-    }
-}
-
-BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromCStrSizedMediumPayload, std::string);
-BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromCStrSizedMediumPayload, qx::inplace_string<126>);
 
 template <class StringT>
 static void BM_InplaceStr_InitFromOtherStringSSO(benchmark::State& state)
