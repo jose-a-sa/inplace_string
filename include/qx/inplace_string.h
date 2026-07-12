@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Jose Sa
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
 #pragma once
 
 #include <algorithm>

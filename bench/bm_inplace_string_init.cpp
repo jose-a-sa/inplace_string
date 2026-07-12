@@ -105,11 +105,8 @@ BENCHMARK_TEMPLATE(BM_InplaceStr_InitFillWithCharSSO, qx::inplace_string<kEquivS
 template <class StringT>
 static void BM_InplaceStr_InitFromArrayIteratorsSSO(benchmark::State& state)
 {
-    std::array<char, 15> values{};
-    for (std::size_t i = 0; i < values.size(); ++i)
-    {
-        values[i] = static_cast<char>('a' + (i % 26));
-    }
+    std::array<char, kSSOSize> values{};
+    std::copy_n(kSSOPayload.begin(), kSSOSize, values.begin());
 
     for (auto _ : state)
     {
@@ -125,11 +122,8 @@ BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromArrayIteratorsSSO, qx::inplace_string<k
 template <class StringT>
 static void BM_InplaceStr_InitFromVectorIteratorsSSO(benchmark::State& state)
 {
-    std::vector<char> values(15, '0');
-    for (std::size_t i = 0; i < values.size(); ++i)
-    {
-        values[i] = static_cast<char>('a' + (i % 26));
-    }
+    std::vector<char> values(kSSOPayload.begin(), kSSOPayload.end());
+
     for (auto _ : state)
     {
         StringT s(values.begin(), values.end());
