@@ -8,14 +8,17 @@
 
 namespace
 {
-    
+
 #ifdef QX_STL_LIBCPP
 constexpr std::string_view kSSOPayload = "123456789012345678901";
-constexpr std::size_t kEquivStackN = 22;
+constexpr std::size_t kSSOSize = 22;
 #else
 constexpr std::string_view kSSOPayload = "12345678901234";
-constexpr std::size_t kEquivStackN = 30;
+constexpr std::size_t kSSOSize = 15;
 #endif
+
+constexpr std::size_t kEquivStackN = (((sizeof(std::string) + sizeof(void*) - 1) / sizeof(void*)) * sizeof(void*)) - 2;
+constexpr std::string_view kMediumPayload = "hello darkness my old friend, I have come to talk with you again";
 
 template <class StringT>
 static void BM_StreamInsertSSO(benchmark::State& state)
