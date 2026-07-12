@@ -138,7 +138,7 @@ jobs:
             -DCMAKE_CXX_STANDARD_REQUIRED=ON \
             -DCMAKE_CXX_FLAGS="$CXXFLAGS -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST" \
             -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
-            -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS" \ 
+            -DCMAKE_SHARED_LINKER_FLAGS="$LDFLAGS" \
             -DQX_BUILD_BENCHMARKS=OFF
 
       - name: Build Project (Release + libc++ hardening=fast)

@@ -54,16 +54,14 @@ qx_register_component(qx_inplace_string inplace_string)
 # Testing & Benchmark
 # ==============================================================================
 option(QX_BUILD_TESTS "Build tests for qxlib" ${PROJECT_IS_TOP_LEVEL})
+option(QX_BUILD_BENCHMARKS "Build benchmarks for qxlib" ${PROJECT_IS_TOP_LEVEL})
 
 if(QX_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
 
-option(QX_BUILD_BENCHMARKS "Build benchmarks for qxlib" ${PROJECT_IS_TOP_LEVEL})
-
 if(QX_BUILD_BENCHMARKS)
-  enable_testing()
   add_subdirectory(bench)
 endif()
 
