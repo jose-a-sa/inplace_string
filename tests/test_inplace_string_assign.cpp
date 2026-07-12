@@ -74,6 +74,8 @@ TEST(InplaceStringAssign, TryAssign)
     EXPECT_EQ(s.try_assign(11, 'z'), nullptr);
 
     EXPECT_STREQ(s.try_append(std::string("new"))->c_str(), "zzzznew");
+
+    EXPECT_STREQ(s.try_assign({'a', 'b'})->c_str(), "ab");
 }
 
 TEST(InplaceStringAssign, OperatorAssign)
@@ -137,4 +139,24 @@ TEST(InplaceStringAssign, SelfReferentialMutations)
     qx::inplace_string<15> s3("abcdef");
     s3.unchecked_assign(s3.data() + 1, 4); // Assigns "bcde"
     EXPECT_STREQ(s3.c_str(), "bcde");
+}
+
+TEST(InplaceStringAssign, AssignInitializerList)
+{
+    qx::inplace_string<10> s("old");
+    
+    // std::initializer_list assignment
+    s.assign({'a', 'b', 'c'});
+    EXPECT_STREQ(s.c_str(), "abc");
+
+    // try_assign initializer list
+    EXPECT_NE(s.try_assign({'x', 'y'}), nullptr);
+    EXPECT_STREQ(s.c_str(), "xy");
+
+    qx::inplace_string<2> small;
+    EXPECT_EQ(small.try_assign({'1', '2', '3'}), nullptr); // Overflow check
+    
+    // unchecked_assign initializer list
+    s.unchecked_assign({'z'});
+    EXPECT_STREQ(s.c_str(), "z");
 }
