@@ -22,7 +22,9 @@ foreach(_test_file IN LISTS test_files)
         QX_HARDENING_MODE=QX_HARDENING_MODE_ALL
         QX_ASSERT_MODE=QX_ASSERT_MODE_LOG_TRAP
     )
-    gtest_discover_tests(${_test_name})
+    gtest_discover_tests("${_test_name}"
+        DISCOVERY_MODE PRE_TEST
+    )
 endforeach()
 
 unset(test_files)
