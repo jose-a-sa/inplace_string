@@ -102,7 +102,7 @@ TEST(InplaceStringCompare, ExceptionsAndContracts)
         "contract violation");
 }
 
-#if __cplusplus > 202002L
+#if __cplusplus >= 202002L
 
 TEST(InplaceStringQueries, StartsWith)
 {
@@ -149,7 +149,7 @@ TEST(InplaceStringQueries, EmptyStringStartsEndsWithChar)
 
 #endif
 
-#if __cplusplus > 202302L
+#if __cplusplus >= 202302L
 
 TEST(InplaceStringQueries, Contains)
 {

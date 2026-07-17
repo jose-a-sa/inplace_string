@@ -213,7 +213,7 @@ TEST(InplaceStringInit, NullPointerConstructorDeath)
 
 // Compile-time (constexpr) evaluation
 
-#if __cplusplus > 202002L
+#if __cplusplus >= 202002L
 
 namespace
 {

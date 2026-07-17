@@ -2072,7 +2072,7 @@ public:
 
 #endif
 
-#if __cplusplus > 202302L
+#if __cplusplus >= 202302L
 
     // contains
 
