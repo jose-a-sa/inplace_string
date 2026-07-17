@@ -11,7 +11,7 @@ namespace
 constexpr std::string_view kMediumPayload = "the quick brown fox jumps over the lazy dog";
 
 template <typename StringT>
-static void BM_InplaceStr_FindInMedium(benchmark::State& state)
+void BM_InplaceStr_FindInMedium(benchmark::State& state)
 {
     StringT s(kMediumPayload.data(), kMediumPayload.size());
     for (auto _ : state)

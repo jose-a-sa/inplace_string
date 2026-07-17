@@ -118,3 +118,44 @@ install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
 )
+
+# ==============================================================================
+# Auto clang format
+# ==============================================================================
+find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format)
+
+if(CLANG_FORMAT_EXECUTABLE)
+    set(CLANG_FORMAT_DIRS
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/tests
+        ${CMAKE_SOURCE_DIR}/bench
+    )
+
+    set(ALL_SOURCE_FILES)
+    foreach(dir IN LISTS CLANG_FORMAT_DIRS)
+        file(GLOB_RECURSE DIR_FILES
+            CONFIGURE_DEPENDS
+            ${dir}/*.c
+            ${dir}/*.cc
+            ${dir}/*.cpp
+            ${dir}/*.cxx
+            ${dir}/*.h
+            ${dir}/*.hh
+            ${dir}/*.hpp
+        )
+        list(APPEND ALL_SOURCE_FILES ${DIR_FILES})
+    endforeach()
+
+    list(REMOVE_DUPLICATES ALL_SOURCE_FILES)
+
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXECUTABLE}
+                -i
+                -style=file
+                ${ALL_SOURCE_FILES}
+        COMMENT "Formatting source files with clang-format"
+    )
+else()
+    message(WARNING "clang-format not found")
+endif()

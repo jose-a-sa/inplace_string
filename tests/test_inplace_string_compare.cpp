@@ -2,9 +2,7 @@
 
 #include <qx/inplace_string.h>
 
-// ===========================================================================
 // Compare (compare, ==, !=, <, >, <=, >=)
-// ===========================================================================
 
 TEST(InplaceStringCompare, CompareMember)
 {
@@ -16,6 +14,33 @@ TEST(InplaceStringCompare, CompareMember)
     qx::inplace_string<20> const s3("prefix_abc_suffix");
     EXPECT_EQ(s3.compare(7, 3, "abc"), 0);
     EXPECT_LT(s3.compare(7, 2, "abc", 3), 0);
+}
+
+TEST(InplaceStringCompare, CompareWholeStringLengthMismatch)
+{
+    qx::inplace_string<10> const shorter("abc");
+    qx::inplace_string<10> const longer("abcd");
+    EXPECT_LT(shorter.compare(longer), 0);
+    EXPECT_GT(longer.compare(shorter), 0);
+}
+
+TEST(InplaceStringCompare, ComparePosBasedOverloads)
+{
+    qx::inplace_string<20> const s3("prefix_abc_suffix");
+
+    EXPECT_GT(s3.compare(7, 5, "ab", 2), 0);
+    EXPECT_NE(s3.compare(7, 3, "xyz", 3), 0);
+
+    qx::inplace_string<10> const abc("abc");
+    EXPECT_EQ(abc.compare("abc"), 0);
+
+    qx::inplace_string<10> const other("abc");
+    EXPECT_EQ(abc.compare(0, 3, other), 0);
+
+    std::string const std_other("abc");
+    EXPECT_EQ(abc.compare(0, 3, std_other), 0);
+    EXPECT_EQ(abc.compare(0, 3, other, 0, 3), 0);
+    EXPECT_EQ(abc.compare(0, 3, std_other, 0, 3), 0);
 }
 
 TEST(InplaceStringCompare, EqualityOperators)
@@ -61,16 +86,20 @@ TEST(InplaceStringCompare, ExceptionsAndContracts)
             char const* null_str = nullptr;
             s.compare(null_str);
         },
-        "contract violation"
-    );
+        "contract violation");
     EXPECT_DEATH(
         {
             char const* null_str = nullptr;
             bool b = (s == null_str);
             (void)b;
         },
-        "contract violation"
-    );
+        "contract violation");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            s.compare(0, 1, null_str);
+        },
+        "contract violation");
 }
 
 #if __cplusplus > 202002L
@@ -84,6 +113,15 @@ TEST(InplaceStringQueries, StartsWith)
     EXPECT_FALSE(s.starts_with('e'));
 }
 
+TEST(InplaceStringQueries, StartsWithStringViewOverload)
+{
+    qx::inplace_string<20> const s("hello world");
+    std::string_view const match("hello");
+    std::string_view const mismatch("world");
+    EXPECT_TRUE(s.starts_with(match));
+    EXPECT_FALSE(s.starts_with(mismatch));
+}
+
 TEST(InplaceStringQueries, EndsWith)
 {
     qx::inplace_string<20> const s("hello world");
@@ -91,6 +129,22 @@ TEST(InplaceStringQueries, EndsWith)
     EXPECT_TRUE(s.ends_with('d'));
     EXPECT_FALSE(s.ends_with("hello"));
     EXPECT_FALSE(s.ends_with('l'));
+}
+
+TEST(InplaceStringQueries, EndsWithStringViewOverload)
+{
+    qx::inplace_string<20> const s("hello world");
+    std::string_view const match("world");
+    std::string_view const mismatch("hello");
+    EXPECT_TRUE(s.ends_with(match));
+    EXPECT_FALSE(s.ends_with(mismatch));
+}
+
+TEST(InplaceStringQueries, EmptyStringStartsEndsWithChar)
+{
+    qx::inplace_string<10> const empty;
+    EXPECT_FALSE(empty.starts_with('a'));
+    EXPECT_FALSE(empty.ends_with('a'));
 }
 
 #endif

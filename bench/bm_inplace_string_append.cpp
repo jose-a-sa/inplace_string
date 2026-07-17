@@ -21,7 +21,7 @@ constexpr std::size_t kEquivStackN = (((sizeof(std::string) + sizeof(void*) - 1)
 constexpr std::string_view kRepeatedPayload = "qx::inplace_string";
 
 template <typename StringT>
-static void BM_InplaceStr_AppendSSO(benchmark::State& state)
+void BM_InplaceStr_AppendSSO(benchmark::State& state)
 {
     for (auto _ : state)
     {
@@ -35,7 +35,7 @@ BENCHMARK_TEMPLATE(BM_InplaceStr_AppendSSO, std::string);
 BENCHMARK_TEMPLATE(BM_InplaceStr_AppendSSO, qx::inplace_string<kEquivStackN>);
 
 template <typename StringT>
-static void BM_InplaceStr_AppendRepeated(benchmark::State& state)
+void BM_InplaceStr_AppendRepeated(benchmark::State& state)
 {
     for (auto _ : state)
     {
@@ -50,7 +50,7 @@ static void BM_InplaceStr_AppendRepeated(benchmark::State& state)
 }
 
 BENCHMARK_TEMPLATE(BM_InplaceStr_AppendRepeated, std::string);
-BENCHMARK_TEMPLATE(BM_InplaceStr_AppendRepeated, qx::inplace_string<254>);
+BENCHMARK_TEMPLATE(BM_InplaceStr_AppendRepeated, qx::inplace_string<509>);
 
 } // namespace
 

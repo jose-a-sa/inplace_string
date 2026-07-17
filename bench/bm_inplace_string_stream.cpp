@@ -21,21 +21,22 @@ constexpr std::size_t kEquivStackN = (((sizeof(std::string) + sizeof(void*) - 1)
 constexpr std::string_view kMediumPayload = "hello darkness my old friend, I have come to talk with you again";
 
 template <class StringT>
-static void BM_StreamInsertSSO(benchmark::State& state)
+void BM_InplaceStr_StreamInsertSSO(benchmark::State& state)
 {
+    StringT value(kSSOPayload.data(), kSSOPayload.size());
     for (auto _ : state)
     {
         std::ostringstream oss;
-        oss << StringT(kSSOPayload.data(), kSSOPayload.size());
+        oss << value;
         benchmark::DoNotOptimize(oss.str());
     }
 }
 
-BENCHMARK_TEMPLATE(BM_StreamInsertSSO, std::string);
-BENCHMARK_TEMPLATE(BM_StreamInsertSSO, qx::inplace_string<30>);
+BENCHMARK_TEMPLATE(BM_InplaceStr_StreamInsertSSO, std::string);
+BENCHMARK_TEMPLATE(BM_InplaceStr_StreamInsertSSO, qx::inplace_string<kEquivStackN>);
 
 template <class StringT>
-static void BM_StreamExtractSSO(benchmark::State& state)
+void BM_InplaceStr_StreamExtractSSO(benchmark::State& state)
 {
     std::istringstream iss(std::string{kSSOPayload.data(), kSSOPayload.size()});
     for (auto _ : state)
@@ -46,8 +47,40 @@ static void BM_StreamExtractSSO(benchmark::State& state)
     }
 }
 
-BENCHMARK_TEMPLATE(BM_StreamExtractSSO, std::string);
-BENCHMARK_TEMPLATE(BM_StreamExtractSSO, qx::inplace_string<kEquivStackN>);
+BENCHMARK_TEMPLATE(BM_InplaceStr_StreamExtractSSO, std::string);
+BENCHMARK_TEMPLATE(BM_InplaceStr_StreamExtractSSO, qx::inplace_string<kEquivStackN>);
+
+template <class StringT>
+void BM_InplaceStr_StreamInsertMedium(benchmark::State& state)
+{
+    StringT value(kMediumPayload.data(), kMediumPayload.size());
+    for (auto _ : state)
+    {
+        std::ostringstream oss;
+        oss << value;
+        benchmark::DoNotOptimize(oss.str());
+    }
+}
+
+BENCHMARK_TEMPLATE(BM_InplaceStr_StreamInsertMedium, std::string);
+BENCHMARK_TEMPLATE(BM_InplaceStr_StreamInsertMedium, qx::inplace_string<kMediumPayload.size()>);
+
+template <class StringT>
+void BM_InplaceStr_StreamExtractMedium(benchmark::State& state)
+{
+    std::istringstream iss(std::string{kSSOPayload.data(), kSSOPayload.size()});
+    StringT value;
+    value.reserve(kSSOPayload.size());
+    for (auto _ : state)
+    {
+        value.clear();
+        iss >> value;
+        benchmark::DoNotOptimize(value);
+    }
+}
+
+BENCHMARK_TEMPLATE(BM_InplaceStr_StreamExtractMedium, std::string);
+BENCHMARK_TEMPLATE(BM_InplaceStr_StreamExtractMedium, qx::inplace_string<kMediumPayload.size()>);
 
 } // namespace
 

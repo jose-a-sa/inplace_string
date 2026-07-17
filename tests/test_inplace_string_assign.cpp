@@ -2,11 +2,10 @@
 
 #include <qx/inplace_string.h>
 
+#include <list>
 #include <string_view>
 
-// ===========================================================================
 // Assignment (assign, try_assign, unchecked_assign, operator=)
-// ===========================================================================
 
 TEST(InplaceStringAssign, BasicAssign)
 {
@@ -39,6 +38,21 @@ TEST(InplaceStringAssign, AssignSubstring)
     EXPECT_THROW(s.assign(src, 99, 1), std::out_of_range);
     qx::inplace_string<10> const s_src("abc");
     EXPECT_THROW(s.assign(s_src, 99, 1), std::out_of_range);
+}
+
+TEST(InplaceStringAssign, AssignSubstringNSaturation)
+{
+    qx::inplace_string<10> s;
+    qx::inplace_string<10> const src("abcdef");
+    s.assign(src, 2, qx::inplace_string<10>::npos);
+    EXPECT_STREQ(s.c_str(), "cdef");
+
+    std::string const str_src("abcdef");
+    s.assign(str_src, 2, 100);
+    EXPECT_STREQ(s.c_str(), "cdef");
+
+    s.assign(src, src.size(), 5);
+    EXPECT_TRUE(s.empty());
 }
 
 TEST(InplaceStringAssign, UncheckedAssign)
@@ -91,6 +105,14 @@ TEST(InplaceStringAssign, OperatorAssign)
     EXPECT_THROW((qx::inplace_string<0>{} = 'x'), std::length_error);
 }
 
+TEST(InplaceStringAssign, OperatorAssignStringLike)
+{
+    qx::inplace_string<10> s;
+    std::string const src("stringlike");
+    s = src;
+    EXPECT_STREQ(s.c_str(), "stringlike");
+}
+
 TEST(InplaceStringAssign, SelfAssignment)
 {
     qx::inplace_string<15> s("self");
@@ -110,53 +132,101 @@ TEST(InplaceStringAssign, ExceptionsAndContracts)
 {
     qx::inplace_string<5> s;
     EXPECT_THROW(s.assign("abcdef"), std::length_error);
+    EXPECT_THROW(s.assign(6, 'x'), std::length_error); // fill-assign capacity check
     EXPECT_DEATH(
         {
             char const* null_str = nullptr;
             s.assign(null_str, 5);
         },
-        "contract violation"
-    );
+        "contract violation");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            s.assign(null_str);
+        },
+        "contract violation");
+}
+
+TEST(InplaceStringAssign, UncheckedAssignExceptionsAndContracts)
+{
+    qx::inplace_string<5> s;
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            s.unchecked_assign(null_str, 5);
+        },
+        "contract violation");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            s.unchecked_assign(null_str);
+        },
+        "contract violation");
+}
+
+TEST(InplaceStringAssign, TryAssignExceptionsAndContracts)
+{
+    qx::inplace_string<5> s;
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            (void)s.try_assign(null_str, 5);
+        },
+        "contract violation");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            (void)s.try_assign(null_str);
+        },
+        "contract violation");
 }
 
 TEST(InplaceStringAssign, SelfReferentialMutations)
 {
-    // Try assign with itself
     qx::inplace_string<15> s1("abc");
     EXPECT_NE(s1.try_assign(s1), nullptr);
     EXPECT_STREQ(s1.c_str(), "abc");
 
-    // Unchecked assign with itself
     s1.unchecked_assign(s1);
     EXPECT_STREQ(s1.c_str(), "abc");
 
-    // Assigning a raw pointer pointing into its own buffer (shrinking)
     qx::inplace_string<15> s2("abcdef");
     s2.assign(s2.data() + 2, 3); // Assigns "cde"
     EXPECT_STREQ(s2.c_str(), "cde");
 
-    // Unchecked assignment from an internal pointer
     qx::inplace_string<15> s3("abcdef");
     s3.unchecked_assign(s3.data() + 1, 4); // Assigns "bcde"
     EXPECT_STREQ(s3.c_str(), "bcde");
 }
 
+TEST(InplaceStringAssign, AssignIteratorPairOverlappingBuffer)
+{
+    qx::inplace_string<15> s("abcdef");
+    s.assign(s.data() + 1, s.data() + 5); // "bcde", overlapping source range
+    EXPECT_STREQ(s.c_str(), "bcde");
+}
+
+TEST(InplaceStringAssign, AssignIteratorPairNonContiguousForward)
+{
+    qx::inplace_string<15> s("old");
+    std::list<char> lst{'l', 'i', 's', 't'};
+    s.assign(lst.begin(), lst.end());
+    EXPECT_STREQ(s.c_str(), "list");
+}
+
 TEST(InplaceStringAssign, AssignInitializerList)
 {
     qx::inplace_string<10> s("old");
-    
-    // std::initializer_list assignment
+
     s.assign({'a', 'b', 'c'});
     EXPECT_STREQ(s.c_str(), "abc");
 
-    // try_assign initializer list
     EXPECT_NE(s.try_assign({'x', 'y'}), nullptr);
     EXPECT_STREQ(s.c_str(), "xy");
 
     qx::inplace_string<2> small;
     EXPECT_EQ(small.try_assign({'1', '2', '3'}), nullptr); // Overflow check
-    
-    // unchecked_assign initializer list
+
     s.unchecked_assign({'z'});
     EXPECT_STREQ(s.c_str(), "z");
 }

@@ -2,9 +2,7 @@
 
 #include <qx/inplace_string.h>
 
-// ===========================================================================
 // Replace
-// ===========================================================================
 
 TEST(InplaceStringReplace, BasicReplace)
 {
@@ -25,6 +23,48 @@ TEST(InplaceStringReplace, BasicReplace)
     EXPECT_STREQ(s4.c_str(), "aXXXXXcde");
 }
 
+TEST(InplaceStringReplace, ShrinkWithTailMove)
+{
+    qx::inplace_string<10> s3("abcde");
+    s3.replace(1, 3, "X");
+    EXPECT_STREQ(s3.c_str(), "aXe");
+}
+
+TEST(InplaceStringReplace, ShrinkAtEndSkipsTailMove)
+{
+    qx::inplace_string<20> s("abcdef");
+    s.replace(3, 3, "X");
+    EXPECT_STREQ(s.c_str(), "abcX");
+}
+
+TEST(InplaceStringReplace, DeleteMiddleViaEmptyReplacement)
+{
+    qx::inplace_string<20> s("abcdef");
+    s.replace(1, 3, "");
+    EXPECT_STREQ(s.c_str(), "aef");
+}
+
+TEST(InplaceStringReplace, DeleteSuffixViaEmptyReplacement)
+{
+    qx::inplace_string<20> s("abcdef");
+    s.replace(3, 3, "");
+    EXPECT_STREQ(s.c_str(), "abc");
+}
+
+TEST(InplaceStringReplace, GrowNoOverlapWithTailMove)
+{
+    qx::inplace_string<20> s4("abcde");
+    s4.replace(1, 1, "XXXXX");
+    EXPECT_STREQ(s4.c_str(), "aXXXXXcde");
+}
+
+TEST(InplaceStringReplace, GrowAtEndSkipsTailMove)
+{
+    qx::inplace_string<20> s("abcdef");
+    s.replace(3, 3, "XYZW");
+    EXPECT_STREQ(s.c_str(), "abcXYZW");
+}
+
 TEST(InplaceStringReplace, ReplaceIterators)
 {
     qx::inplace_string<20> s("the quick fox");
@@ -41,12 +81,74 @@ TEST(InplaceStringReplace, ReplaceIterators)
     EXPECT_STREQ(s2.c_str(), "aXYZe");
 }
 
+TEST(InplaceStringReplace, ReplaceIteratorsStringLike)
+{
+    qx::inplace_string<20> s("the quick fox");
+    std::string const rep = "slow";
+    s.replace(s.begin() + 4, s.begin() + 9, rep);
+    EXPECT_STREQ(s.c_str(), "the slow fox");
+}
+
+TEST(InplaceStringReplace, ReplaceStringLikeSimple)
+{
+    qx::inplace_string<20> s("hello world");
+    std::string const rep = "there";
+    s.replace(6, 5, rep);
+    EXPECT_STREQ(s.c_str(), "hello there");
+}
+
 TEST(InplaceStringReplace, ReplaceSubstring)
 {
     qx::inplace_string<20> s("the quick fox");
     qx::inplace_string<10> const src("laziness");
     s.replace(4, 5, src, 0, 4);
     EXPECT_STREQ(s.c_str(), "the lazi fox");
+}
+
+TEST(InplaceStringReplace, ReplaceSubstringThrowsAndSaturates)
+{
+    qx::inplace_string<20> s("hello world");
+    qx::inplace_string<20> const src("laziness"); // same N as s
+    EXPECT_THROW(s.replace(0, 5, src, 99, 1), std::out_of_range);
+    s.replace(0, 5, src, 4, 100); // n2 (via overflow) saturates to remaining
+    EXPECT_STREQ(s.c_str(), "ness world");
+
+    qx::inplace_string<20> s2("hello world");
+    qx::inplace_string<10> const src10("laziness");
+    EXPECT_THROW(s2.replace(0, 5, src10, 99, 1), std::out_of_range);
+    s2.replace(0, 5, src10, 4, 100);
+    EXPECT_STREQ(s2.c_str(), "ness world");
+
+    qx::inplace_string<20> s3("hello world");
+    std::string const str_src = "laziness";
+    EXPECT_THROW(s3.replace(0, 5, str_src, 99, 1), std::out_of_range);
+    s3.replace(0, 5, str_src, 4, 100);
+    EXPECT_STREQ(s3.c_str(), "ness world");
+}
+
+TEST(InplaceStringReplace, ReplacePosCountChar)
+{
+    qx::inplace_string<20> s("hello world");
+
+    s.replace(6, 5, 4, 'X'); // replace 5 chars ("world") with 4 'X's
+    EXPECT_STREQ(s.c_str(), "hello XXXX");
+
+    s.replace(0, 5, 6, 'Y'); // replace "hello" with "YYYYYY"
+    EXPECT_STREQ(s.c_str(), "YYYYYY XXXX");
+}
+
+TEST(InplaceStringReplace, ReplacePosCountCharEqualCounts)
+{
+    qx::inplace_string<10> s("abc");
+    s.replace(1, 1, 1, 'X');
+    EXPECT_STREQ(s.c_str(), "aXc");
+}
+
+TEST(InplaceStringReplace, ReplacePosCountCharExceptionsAndContracts)
+{
+    qx::inplace_string<5> s("abcd");
+    EXPECT_THROW(s.replace(99, 1, 1, 'x'), std::out_of_range);
+    EXPECT_THROW(s.replace(1, 1, 10, 'x'), std::length_error);
 }
 
 TEST(InplaceStringReplace, ExceptionsAndContracts)
@@ -59,15 +161,20 @@ TEST(InplaceStringReplace, ExceptionsAndContracts)
             char const* null_str = nullptr;
             s.replace(0, 1, null_str);
         },
-        "contract violation"
-    );
+        "contract violation");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            s.replace(0, 1, null_str, 2);
+        },
+        "contract violation");
 }
 
 TEST(InplaceStringReplace, SelfReferentialAdditional)
 {
     qx::inplace_string<32> s1("ABCDEF");
     std::string_view sv(s1.data() + 1, 3); // points to "BCD"
-    s1.replace(2, 2, sv); // Replaces "CD" with "BCD" -> "ABBCDEF"
+    s1.replace(2, 2, sv);                  // Replaces "CD" with "BCD" -> "ABBCDEF"
     EXPECT_STREQ(s1.c_str(), "ABBCDEF");
 
     qx::inplace_string<32> s2("012345");
@@ -77,7 +184,7 @@ TEST(InplaceStringReplace, SelfReferentialAdditional)
     qx::inplace_string<32> s3("abcdefgh");
     s3.replace(2, 3, s3, 4, 3); // Replaces "cde" with "efg"
     EXPECT_STREQ(s3.c_str(), "abefgfgh");
-    
+
     qx::inplace_string<32> s4("xyz");
     s4.replace(1, 1, s4.data() + 2, 1); // Replaces 'y' with 'z' -> "xzz"
     EXPECT_STREQ(s4.c_str(), "xzz");
@@ -93,7 +200,7 @@ TEST(InplaceStringReplace, SelfReferentialGrow)
 TEST(InplaceStringReplace, SelfReferentialGrowCorrupts)
 {
     qx::inplace_string<32> s = "0123456789";
-    s.replace(2, 2, s, 5, 4); // replace "23" with substr(5,4) == "5678"
+    s.replace(2, 2, s, 5, 4);                // replace "23" with substr(5,4) == "5678"
     EXPECT_STREQ(s.c_str(), "015678456789"); // currently produces "015456456789"
 }
 
@@ -118,23 +225,10 @@ TEST(InplaceStringReplace, SelfReferentialGrowSourceBeforePos)
     EXPECT_STREQ(s.c_str(), "ABCDABCFGH");
 }
 
-TEST(InplaceStringReplace, ReplacePosCountChar)
-{
-    qx::inplace_string<20> s("hello world");
-    
-    // replace(pos, n1, n2, c)
-    s.replace(6, 5, 4, 'X'); // replace 5 chars ("world") with 4 'X's
-    EXPECT_STREQ(s.c_str(), "hello XXXX");
-    
-    // replace expanding
-    s.replace(0, 5, 6, 'Y'); // replace "hello" with "YYYYYY"
-    EXPECT_STREQ(s.c_str(), "YYYYYY XXXX");
-}
-
 TEST(InplaceStringReplace, ReplaceIteratorWithPointersAndList)
 {
     qx::inplace_string<20> s("abcdef");
-    
+
     // replace(it1, it2, ptr, n)
     s.replace(s.begin() + 1, s.begin() + 3, "XYZW", 3); // "bc" -> "XYZ"
     EXPECT_STREQ(s.c_str(), "aXYZdef");
@@ -146,7 +240,7 @@ TEST(InplaceStringReplace, ReplaceIteratorWithPointersAndList)
     // replace(it1, it2, initializer_list)
     s.replace(s.begin() + 1, s.begin() + 2, {'1', '2'}); // "B" -> "12"
     EXPECT_STREQ(s.c_str(), "a12def");
-    
+
     // replace(it1, it2, n, c)
     s.replace(s.begin() + 1, s.begin() + 3, 3, '9'); // "12" -> "999"
     EXPECT_STREQ(s.c_str(), "a999def");
