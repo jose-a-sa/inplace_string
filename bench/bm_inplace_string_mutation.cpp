@@ -7,10 +7,11 @@
 
 namespace
 {
+
 constexpr std::string_view kMediumPayload = "the quick brown fox jumps over the lazy dog";
 
 template <typename StringT>
-static void BM_Replace(benchmark::State& state)
+void BM_InplaceStr_Replace(benchmark::State& state)
 {
     StringT value(kMediumPayload.data(), kMediumPayload.size());
     for (auto _ : state)
@@ -20,8 +21,8 @@ static void BM_Replace(benchmark::State& state)
     }
 }
 
-BENCHMARK_TEMPLATE(BM_Replace, std::string);
-BENCHMARK_TEMPLATE(BM_Replace, qx::inplace_string<126>);
+BENCHMARK_TEMPLATE(BM_InplaceStr_Replace, std::string);
+BENCHMARK_TEMPLATE(BM_InplaceStr_Replace, qx::inplace_string<126>);
 
 } // namespace
 

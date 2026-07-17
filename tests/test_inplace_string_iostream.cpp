@@ -11,9 +11,7 @@
 #include <qx/inplace_string.h>
 #include <string>
 
-// ---------------------------------------------------------------------------
 // operator<<
-// ---------------------------------------------------------------------------
 
 TEST(InplaceStringInsertion, Basic)
 {
@@ -126,9 +124,6 @@ TEST(InplaceStringInsertion, ExplicitRightJustifyMatchesDefault)
 
 TEST(InplaceStringInsertion, NoOutputWhenStreamAlreadyFailed)
 {
-    // operator<< is a formatted output function: it constructs a sentry
-    // first, and if the stream is already in a failed state, the sentry
-    // fails too and nothing is written at all.
     qx::inplace_string<16> s = "hello";
     std::ostringstream oss;
     oss.setstate(std::ios_base::failbit);
@@ -137,9 +132,7 @@ TEST(InplaceStringInsertion, NoOutputWhenStreamAlreadyFailed)
     EXPECT_TRUE(oss.fail());
 }
 
-// ---------------------------------------------------------------------------
 // operator>>
-// ---------------------------------------------------------------------------
 
 TEST(InplaceStringExtraction, Basic)
 {
@@ -244,18 +237,8 @@ TEST(InplaceStringExtraction, Wchar)
     EXPECT_EQ(s, L"wide");
 }
 
-// ---------------------------------------------------------------------------
-// operator>> capacity overflow: push_back() throws std::length_error when a
-// word needs more than N chars; whether that escapes operator>> depends on
-// the stream's exceptions() mask, per the standard formatted-input contract.
-// ---------------------------------------------------------------------------
-
 TEST(InplaceStringExtractionOverflow, SwallowedByDefaultMask)
 {
-    // No explicit exceptions() mask (default is goodbit): the internal
-    // std::length_error is caught, turned into badbit, and - since the mask
-    // doesn't request badbit - is NOT rethrown to the caller. str retains
-    // whatever prefix was successfully pushed before the throw.
     std::istringstream iss("abcdefghij");
     qx::inplace_string<5> s;
     iss >> s;
@@ -266,8 +249,6 @@ TEST(InplaceStringExtractionOverflow, SwallowedByDefaultMask)
 
 TEST(InplaceStringExtractionOverflow, PropagatesOriginalExceptionWhenMaskSet)
 {
-    // With badbit in the exception mask, the same condition escapes as the
-    // real std::length_error (not a substitute ios_base::failure).
     std::istringstream iss("abcdefghij");
     iss.exceptions(std::ios_base::badbit);
     qx::inplace_string<5> s;
@@ -279,9 +260,6 @@ TEST(InplaceStringExtractionOverflow, PropagatesOriginalExceptionWhenMaskSet)
 
 TEST(InplaceStringExtractionOverflow, StreamUsableAgainAfterClear)
 {
-    // Once badbit is set (default mask swallowed the throw), the stream is
-    // considered failed and further extractions are no-ops until cleared -
-    // same as any other badbit condition, not specific to overflow.
     std::istringstream iss("abcdefghij klm");
     qx::inplace_string<5> s1;
     qx::inplace_string<5> s2;
@@ -291,14 +269,12 @@ TEST(InplaceStringExtractionOverflow, StreamUsableAgainAfterClear)
     EXPECT_TRUE(s2.empty());
 
     iss.clear();
-    iss >> s2; // resumes from wherever the streambuf's get pointer was left
-               // (mid original word - "fghij" - not at " klm")
+    iss >> s2;
     EXPECT_EQ(s2, "fghij");
 }
 
 TEST(InplaceStringExtractionOverflow, NarrowerSetwAvoidsOverflow)
 {
-    // setw() narrower than capacity: stops early, no overflow, no throw.
     std::istringstream iss("abcdefghij");
     qx::inplace_string<32> big;
     iss >> std::setw(4) >> big;
@@ -307,8 +283,6 @@ TEST(InplaceStringExtractionOverflow, NarrowerSetwAvoidsOverflow)
 
 TEST(InplaceStringExtractionOverflow, WiderSetwDoesNotProtectAgainstOverflow)
 {
-    // setw() wider than capacity does NOT protect against overflow: width
-    // can only narrow the read, never authorize exceeding N.
     std::istringstream iss("abcdefghij");
     iss.exceptions(std::ios_base::badbit);
     qx::inplace_string<5> small;
@@ -317,9 +291,7 @@ TEST(InplaceStringExtractionOverflow, WiderSetwDoesNotProtectAgainstOverflow)
     EXPECT_EQ(small, "abcde");
 }
 
-// ---------------------------------------------------------------------------
-// operator>> round-tripping
-// ---------------------------------------------------------------------------
+// round-tripping
 
 TEST(InplaceStringRoundtrip, WriteThenRead)
 {
@@ -348,18 +320,7 @@ TEST(InplaceStringRoundtrip, MultipleTokensPreserveOrder)
     EXPECT_EQ(rc, c);
 }
 
-// ---------------------------------------------------------------------------
-// operator>> exception safety: a streambuf that throws when it's about to
-// hand back a specific "poison" character, exercising the try/catch around
-// the extraction loop. Implemented as an always-unbuffered streambuf (never
-// calls setg) so every sgetc()/sbumpc() call in operator>> goes through
-// underflow()/uflow() - i.e. through our hook - rather than a cached buffer.
-// (A ctype<char> facet override was considered instead, but several standard
-// library implementations bypass the virtual do_is(mask, char) single-
-// character overload as a table-lookup fast path, making that approach
-// unreliable across compilers; hooking the streambuf directly is both more
-// portable and more precisely targeted at what operator>> calls.)
-// ---------------------------------------------------------------------------
+// exception safety
 
 namespace
 {
@@ -407,9 +368,6 @@ TEST(InplaceStringExtractionExceptionSafety, SwallowedByDefaultMask)
     qx::inplace_string<16> s = "sentinel";
     is >> s;
     EXPECT_TRUE(is.bad());
-    // str.clear() already ran and "a","b" were pushed before '#' threw, so
-    // the partially-extracted prefix is what's left in s - not the original
-    // sentinel value and not a rollback to empty.
     EXPECT_EQ(s, "ab");
 }
 

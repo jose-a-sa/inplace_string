@@ -45,6 +45,11 @@ TEST(InplaceString, UncheckedToInplaceStringUsesExplicitCapacity)
     EXPECT_EQ(minimum.size(), 20U);
 }
 
+TEST(InplaceString, UncheckedToInplaceStringContractViolation)
+{
+    EXPECT_DEATH(((void)qx::unchecked_to_inplace_string<2>(255)), "contract violation");
+}
+
 TEST(InplaceString, ToInplaceStringUsesExplicitCapacity)
 {
     auto const explicit_three = qx::to_inplace_string<3>(255);

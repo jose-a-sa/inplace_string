@@ -23,7 +23,7 @@ constexpr std::size_t kEquivStackN = (((sizeof(std::string) + sizeof(void*) - 1)
 constexpr std::string_view kMediumPayload = "hello darkness my old friend, I have come to talk with you again";
 
 template <class StringT>
-static void BM_InplaceStr_InitEmpty(benchmark::State& state)
+void BM_InplaceStr_InitEmpty(benchmark::State& state)
 {
     for (auto _ : state)
     {
@@ -36,7 +36,7 @@ BENCHMARK_TEMPLATE(BM_InplaceStr_InitEmpty, std::string);
 BENCHMARK_TEMPLATE(BM_InplaceStr_InitEmpty, qx::inplace_string<kEquivStackN>);
 
 template <class StringT>
-static void BM_InplaceStr_InitFromCStrSSO(benchmark::State& state)
+void BM_InplaceStr_InitFromCStrSSO(benchmark::State& state)
 {
     for (auto _ : state)
     {
@@ -49,7 +49,7 @@ BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromCStrSSO, std::string);
 BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromCStrSSO, qx::inplace_string<kEquivStackN>);
 
 template <class StringT>
-static void BM_InplaceStr_InitFromCStrSizedSSO(benchmark::State& state)
+void BM_InplaceStr_InitFromCStrSizedSSO(benchmark::State& state)
 {
     for (auto _ : state)
     {
@@ -62,7 +62,7 @@ BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromCStrSizedSSO, std::string);
 BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromCStrSizedSSO, qx::inplace_string<kEquivStackN>);
 
 template <class StringT>
-static void BM_CopyFromStringTSSO(benchmark::State& state)
+void BM_CopyFromStringTSSO(benchmark::State& state)
 {
     StringT source(kSSOPayload);
     for (auto _ : state)
@@ -76,7 +76,7 @@ BENCHMARK_TEMPLATE(BM_CopyFromStringTSSO, std::string);
 BENCHMARK_TEMPLATE(BM_CopyFromStringTSSO, qx::inplace_string<kEquivStackN>);
 
 template <class StringT>
-static void BM_InplaceStr_InitFromOtherStringSSO(benchmark::State& state)
+void BM_InplaceStr_InitFromOtherStringSSO(benchmark::State& state)
 {
     std::string base(kSSOPayload.data(), kSSOPayload.size());
     for (auto _ : state)
@@ -90,7 +90,7 @@ BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromOtherStringSSO, std::string);
 BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromOtherStringSSO, qx::inplace_string<kEquivStackN>);
 
 template <class StringT>
-static void BM_InplaceStr_InitFillWithCharSSO(benchmark::State& state)
+void BM_InplaceStr_InitFillWithCharSSO(benchmark::State& state)
 {
     for (auto _ : state)
     {
@@ -103,7 +103,7 @@ BENCHMARK_TEMPLATE(BM_InplaceStr_InitFillWithCharSSO, std::string);
 BENCHMARK_TEMPLATE(BM_InplaceStr_InitFillWithCharSSO, qx::inplace_string<kEquivStackN>);
 
 template <class StringT>
-static void BM_InplaceStr_InitFromArrayIteratorsSSO(benchmark::State& state)
+void BM_InplaceStr_InitFromArrayIteratorsSSO(benchmark::State& state)
 {
     std::array<char, kSSOSize> values{};
     std::copy_n(kSSOPayload.begin(), kSSOSize, values.begin());
@@ -120,7 +120,7 @@ BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromArrayIteratorsSSO, std::string);
 BENCHMARK_TEMPLATE(BM_InplaceStr_InitFromArrayIteratorsSSO, qx::inplace_string<kEquivStackN>);
 
 template <class StringT>
-static void BM_InplaceStr_InitFromVectorIteratorsSSO(benchmark::State& state)
+void BM_InplaceStr_InitFromVectorIteratorsSSO(benchmark::State& state)
 {
     std::vector<char> values(kSSOPayload.begin(), kSSOPayload.end());
 

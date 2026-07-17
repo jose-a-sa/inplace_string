@@ -2,9 +2,7 @@
 
 #include <qx/inplace_string.h>
 
-// ===========================================================================
 // Erase (erase, clear, pop_back)
-// ===========================================================================
 
 TEST(InplaceStringErase, EraseRanges)
 {
@@ -13,12 +11,52 @@ TEST(InplaceStringErase, EraseRanges)
     EXPECT_STREQ(s.c_str(), "abef");
 
     qx::inplace_string<10> s2("abcdef");
-    s2.erase(3);
+    s2.erase(3); // default n == npos: takes the fast truncate path
     EXPECT_STREQ(s2.c_str(), "abc");
 
     qx::inplace_string<10> s3("abcdef");
-    s3.erase(2, 0);
+    s3.erase(2, 0); // n == 0: no-op branch
     EXPECT_STREQ(s3.c_str(), "abcdef");
+}
+
+TEST(InplaceStringErase, EraseToExactEndSkipsMove)
+{
+    qx::inplace_string<10> s("abcdef");
+    s.erase(4, 2);
+    EXPECT_STREQ(s.c_str(), "abcd");
+}
+
+TEST(InplaceStringErase, EraseAtEndBoundary)
+{
+    qx::inplace_string<10> s("abc");
+    s.erase(s.size());
+    EXPECT_STREQ(s.c_str(), "abc");
+
+    qx::inplace_string<10> s2("abc");
+    s2.erase(s2.size(), 0);
+    EXPECT_STREQ(s2.c_str(), "abc");
+}
+
+TEST(InplaceStringErase, EraseSingleIterator)
+{
+    qx::inplace_string<10> s("abcdef");
+    auto it = s.erase(s.begin() + 2); // remove 'c'
+    EXPECT_STREQ(s.c_str(), "abdef");
+    EXPECT_EQ(*it, 'd');
+}
+
+TEST(InplaceStringErase, EraseIteratorRange)
+{
+    qx::inplace_string<10> s("abcdef");
+    auto it = s.erase(s.begin() + 1, s.begin() + 3); // remove "bc"
+    EXPECT_STREQ(s.c_str(), "adef");
+    EXPECT_EQ(*it, 'd');
+
+    // Empty range (first == last): valid, no-op.
+    qx::inplace_string<10> s2("abcdef");
+    auto it2 = s2.erase(s2.begin() + 2, s2.begin() + 2);
+    EXPECT_STREQ(s2.c_str(), "abcdef");
+    EXPECT_EQ(*it2, 'c');
 }
 
 TEST(InplaceStringErase, ClearAndPopBack)

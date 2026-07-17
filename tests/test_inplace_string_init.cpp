@@ -4,6 +4,7 @@
 
 #include <array>
 #include <deque>
+#include <forward_list>
 #include <list>
 #include <type_traits>
 #include <vector>
@@ -20,9 +21,7 @@ static_assert(std::is_trivially_copyable_v<qx::inplace_wstring<30>>);
 static_assert(std::is_trivially_copyable_v<qx::inplace_string<256>>);
 static_assert(std::is_trivially_copyable_v<qx::inplace_wstring<256>>);
 
-// ===========================================================================
 // Constructors & Initialization
-// ===========================================================================
 
 TEST(InplaceStringInit, DefaultConstructor)
 {
@@ -31,6 +30,15 @@ TEST(InplaceStringInit, DefaultConstructor)
     EXPECT_EQ(s.size(), 0);
     EXPECT_EQ(s.capacity(), 10);
     EXPECT_EQ(s.max_size(), 10);
+    EXPECT_STREQ(s.c_str(), "");
+}
+
+TEST(InplaceStringInit, ZeroCapacityConstructor)
+{
+    // N == 0 is a valid, degenerate instantiation.
+    qx::inplace_string<0> const s;
+    EXPECT_TRUE(s.empty());
+    EXPECT_EQ(s.capacity(), 0);
     EXPECT_STREQ(s.c_str(), "");
 }
 
@@ -68,6 +76,23 @@ TEST(InplaceStringInit, StringViewConstructor)
     EXPECT_STREQ(s3.c_str(), "string");
 }
 
+TEST(InplaceStringInit, StringLikeSubstringConstructorNPosSaturates)
+{
+    std::string const str = "my_substring";
+    qx::inplace_string<20> const s(str, 3, qx::inplace_string<20>::npos);
+    EXPECT_STREQ(s.c_str(), "substring");
+
+    qx::inplace_string<20> const s2(str, 3);
+    EXPECT_STREQ(s2.c_str(), "substring");
+}
+
+TEST(InplaceStringInit, StringLikeSubstringConstructorThrows)
+{
+    std::string const str = "abc";
+    EXPECT_THROW((qx::inplace_string<10>(str, 99, 1)), std::out_of_range);
+    EXPECT_THROW((qx::inplace_string<10>(str, 99)), std::out_of_range);
+}
+
 TEST(InplaceStringInit, FillConstructor)
 {
     qx::inplace_string<5> const s(4, 'x');
@@ -85,12 +110,43 @@ TEST(InplaceStringInit, CopyConstructorAndSubstring)
     EXPECT_THROW((qx::inplace_string<10>(orig, 20, 1)), std::out_of_range);
 }
 
-TEST(InplaceStringInit, RangeConstructor)
+TEST(InplaceStringInit, CopyConstructorNSaturation)
+{
+    qx::inplace_string<10> const orig("abcdef");
+    qx::inplace_string<10> const tail(orig, 2);
+    EXPECT_STREQ(tail.c_str(), "cdef");
+
+    qx::inplace_string<10> const exact(orig, 0, 6);
+    EXPECT_STREQ(exact.c_str(), "abcdef");
+
+    qx::inplace_string<10> const atEnd(orig, 6, 5);
+    EXPECT_TRUE(atEnd.empty());
+}
+
+TEST(InplaceStringInit, RangeConstructorContiguousIterator)
 {
     std::vector<char> v = {'a', 'b', 'c', 'd'};
     qx::inplace_string<10> const s(v.begin(), v.end());
     EXPECT_EQ(s.size(), 4);
     EXPECT_STREQ(s.c_str(), "abcd");
+}
+
+TEST(InplaceStringInit, RangeConstructorNonContiguousForwardIterator)
+{
+    std::list<char> lst{'w', 'x', 'y', 'z'};
+    qx::inplace_string<10> const s(lst.begin(), lst.end());
+    EXPECT_EQ(s.size(), 4);
+    EXPECT_STREQ(s.c_str(), "wxyz");
+
+    std::forward_list<char> flst{'p', 'q', 'r'};
+    qx::inplace_string<10> const s2(flst.begin(), flst.end());
+    EXPECT_STREQ(s2.c_str(), "pqr");
+}
+
+TEST(InplaceStringInit, RangeConstructorForwardOverflowThrows)
+{
+    std::list<char> lst{'a', 'b', 'c', 'd', 'e', 'f'};
+    EXPECT_THROW((qx::inplace_string<3>(lst.begin(), lst.end())), std::length_error);
 }
 
 TEST(InplaceStringInit, InitializerListConstructor)
@@ -119,6 +175,15 @@ TEST(InplaceStringInit, PureInputIterator)
     EXPECT_EQ(s.size(), 9);
 }
 
+TEST(InplaceStringInit, PureInputIteratorOverflowThrowsAndResets)
+{
+    std::istringstream stream("this_is_way_too_long_for_the_buffer");
+    std::istream_iterator<char> start(stream);
+    std::istream_iterator<char> end;
+
+    EXPECT_THROW((qx::inplace_string<4>(start, end)), std::length_error);
+}
+
 TEST(InplaceStringInit, DeductionGuideFromStringLiteral)
 {
     qx::basic_inplace_string s("hello");
@@ -137,13 +202,47 @@ TEST(InplaceStringInit, NullPointerConstructorDeath)
             char const* null_str = nullptr;
             qx::inplace_string<10> const s(null_str);
         },
-        "contract violation"
-    );
+        "contract violation");
     EXPECT_DEATH(
         {
             char const* null_str = nullptr;
             qx::inplace_string<10> const s(null_str, 5);
         },
-        "contract violation"
-    );
+        "contract violation");
 }
+
+// Compile-time (constexpr) evaluation
+
+#if __cplusplus > 202002L
+
+namespace
+{
+
+constexpr bool constexpr_self_referential_insert()
+{
+    qx::inplace_string<10> s("abc");
+    s.insert(1, s.data(), 2); // source aliases the buffer being shifted
+    return s.compare("aabbc") == 0;
+}
+
+constexpr bool constexpr_self_referential_append()
+{
+    qx::inplace_string<20> s("loop");
+    s.append(s);
+    return s.compare("looploop") == 0;
+}
+
+constexpr bool constexpr_default_and_assign()
+{
+    qx::inplace_string<8> s;
+    s.assign("abc");
+    return s.size() == 3;
+}
+
+} // namespace
+
+static_assert(constexpr_self_referential_insert());
+static_assert(constexpr_self_referential_append());
+static_assert(constexpr_default_and_assign());
+
+#endif

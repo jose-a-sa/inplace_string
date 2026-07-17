@@ -3,11 +3,10 @@
 #include <qx/inplace_string.h>
 
 #include <list>
+#include <sstream>
 #include <vector>
 
-// ===========================================================================
 // Append (append, try_append, unchecked_append, push_back, operator+=)
-// ===========================================================================
 
 TEST(InplaceStringAppend, BasicAppend)
 {
@@ -28,6 +27,48 @@ TEST(InplaceStringAppend, BasicAppend)
     EXPECT_STREQ(s3.c_str(), "start-cdebar");
 }
 
+TEST(InplaceStringAppend, AppendPlainFill)
+{
+    qx::inplace_string<10> s("ab");
+    s.append(3, 'y');
+    EXPECT_STREQ(s.c_str(), "abyyy");
+
+    s.append(0, 'z'); // n == 0: no-op branch
+    EXPECT_STREQ(s.c_str(), "abyyy");
+}
+
+TEST(InplaceStringAppend, AppendSubstringThrowsAndSaturates)
+{
+    qx::inplace_string<20> s("start-");
+    qx::inplace_string<10> const src("abcdef");
+
+    EXPECT_THROW(s.append(src, 99, 1), std::out_of_range);
+
+    std::string const str_src("abcdef");
+    EXPECT_THROW(s.append(str_src, 99, 1), std::out_of_range);
+
+    s.append(src, 2, qx::inplace_string<10>::npos);
+    EXPECT_STREQ(s.c_str(), "start-cdef");
+
+    qx::inplace_string<20> s2("x-");
+    s2.append(str_src, 2, 100);
+    EXPECT_STREQ(s2.c_str(), "x-cdef");
+}
+
+TEST(InplaceStringAppend, AppendSubstringSameCapacityOverload)
+{
+    qx::inplace_string<20> s("start-");
+    qx::inplace_string<20> const src("abcdef"); // same N as s
+
+    EXPECT_THROW(s.append(src, 99, 1), std::out_of_range);
+    s.append(src, 2, 3);
+    EXPECT_STREQ(s.c_str(), "start-cde");
+
+    qx::inplace_string<20> s2("x-");
+    s2.append(src, 2, qx::inplace_string<20>::npos); // n saturates, matching N
+    EXPECT_STREQ(s2.c_str(), "x-cdef");
+}
+
 TEST(InplaceStringAppend, AppendIterators)
 {
     qx::inplace_string<20> s1("vec:");
@@ -39,6 +80,29 @@ TEST(InplaceStringAppend, AppendIterators)
     std::list<char> lst{'x', 'y', 'z'};
     s2.append(lst.begin(), lst.end());
     EXPECT_STREQ(s2.c_str(), "list:xyz");
+}
+
+TEST(InplaceStringAppend, AppendIteratorsEmptyRangeAndOverflow)
+{
+    // Empty range: n == 0 short-circuit, before any capacity check.
+    qx::inplace_string<10> s("abc");
+    std::vector<char> empty_vec;
+    s.append(empty_vec.begin(), empty_vec.end());
+    EXPECT_STREQ(s.c_str(), "abc");
+
+    // Trivial-contiguous fast path, but the range doesn't fit.
+    std::vector<char> big{'1', '2', '3', '4', '5', '6', '7', '8'};
+    EXPECT_THROW(s.append(big.begin(), big.end()), std::length_error);
+}
+
+TEST(InplaceStringAppend, AppendPureInputIterator)
+{
+    qx::inplace_string<20> s("stream:");
+    std::istringstream stream("xyz");
+    std::istream_iterator<char> begin(stream);
+    std::istream_iterator<char> end;
+    s.append(begin, end);
+    EXPECT_STREQ(s.c_str(), "stream:xyz");
 }
 
 TEST(InplaceStringAppend, UncheckedAppend)
@@ -70,6 +134,13 @@ TEST(InplaceStringAppend, TryAppend)
     EXPECT_STREQ(s.c_str(), "abcdxxxyz");
 }
 
+TEST(InplaceStringAppend, TryAppendFillCapacityFailure)
+{
+    qx::inplace_string<5> s("ab");
+    EXPECT_EQ(s.try_append(10, 'x'), nullptr);
+    EXPECT_STREQ(s.c_str(), "ab");
+}
+
 TEST(InplaceStringAppend, OperatorPlusEq)
 {
     qx::inplace_string<10> s("abc");
@@ -81,6 +152,9 @@ TEST(InplaceStringAppend, OperatorPlusEq)
     std::string bar = "g";
     s += bar;
     EXPECT_STREQ(s.c_str(), "abcdefg");
+
+    s += {'h', 'i'};
+    EXPECT_STREQ(s.c_str(), "abcdefghi");
 }
 
 TEST(InplaceStringAppend, PushBack)
@@ -92,6 +166,18 @@ TEST(InplaceStringAppend, PushBack)
 
     qx::inplace_string<5> full("abcde");
     EXPECT_THROW(full.push_back('f'), std::length_error);
+}
+
+TEST(InplaceStringAppend, TryPushBack)
+{
+    qx::inplace_string<3> s;
+    EXPECT_NE(s.try_push_back('a'), nullptr);
+    EXPECT_NE(s.try_push_back('b'), nullptr);
+    EXPECT_NE(s.try_push_back('c'), nullptr);
+    EXPECT_STREQ(s.c_str(), "abc");
+
+    EXPECT_EQ(s.try_push_back('d'), nullptr); // capacity() == size(): fails
+    EXPECT_STREQ(s.c_str(), "abc");           // unchanged
 }
 
 TEST(InplaceStringAppend, SelfOverlapping)
@@ -116,34 +202,68 @@ TEST(InplaceStringAppend, ExceptionsAndContracts)
             char const* null_str = nullptr;
             s.append(null_str);
         },
-        "contract violation"
-    );
+        "contract violation");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            s.append(null_str, 3);
+        },
+        "contract violation");
+}
+
+TEST(InplaceStringAppend, UncheckedAppendExceptionsAndContracts)
+{
+    qx::inplace_string<10> s("abcd");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            s.unchecked_append(null_str);
+        },
+        "contract violation");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            s.unchecked_append(null_str, 3);
+        },
+        "contract violation");
+}
+
+TEST(InplaceStringAppend, TryAppendExceptionsAndContracts)
+{
+    qx::inplace_string<10> s("abcd");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            (void)s.try_append(null_str);
+        },
+        "contract violation");
+    EXPECT_DEATH(
+        {
+            char const* null_str = nullptr;
+            (void)s.try_append(null_str, 3);
+        },
+        "contract violation");
 }
 
 TEST(InplaceStringAppend, SelfReferentialMutations)
 {
-    // Full self-appending (s.append(s))
     qx::inplace_string<20> s1("abc");
     s1.append(s1);
     EXPECT_STREQ(s1.c_str(), "abcabc");
 
-    // Substring self-appending (s.append(s, pos, count))
     qx::inplace_string<20> s2("abcdef");
     s2.append(s2, 1, 3); // Appends "bcd"
     EXPECT_STREQ(s2.c_str(), "abcdefbcd");
 
-    // Unchecked self-appending
     qx::inplace_string<20> s3("xyz");
     s3.unchecked_append(s3);
     EXPECT_STREQ(s3.c_str(), "xyzxyz");
 
-    // Try self-appending
     qx::inplace_string<20> s4("123");
     EXPECT_NE(s4.try_append(s4), nullptr);
     EXPECT_STREQ(s4.c_str(), "123123");
 
-    // Appending a raw pointer pointing inside its own internal buffer
     qx::inplace_string<20> s5("hello");
-    s5.append(s5.data() + 1, 3); // Appends "ell"
+    s5.append(s5.data() + 1, 3);
     EXPECT_STREQ(s5.c_str(), "helloell");
 }
