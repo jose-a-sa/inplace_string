@@ -18,7 +18,7 @@ jobs:
           - {os: macos-14, cc: clang, cxx: clang++, stdlib: libc++}
           - {os: macos-15, cc: clang, cxx: clang++, stdlib: libc++}
           - {os: macos-26, cc: clang, cxx: clang++, stdlib: libc++}
-        cpp_std: [17, 20]
+        cpp_std: [17, 20, 23]
 
     env:
       CC: ${{ matrix.cfg.cc }}

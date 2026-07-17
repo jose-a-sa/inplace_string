@@ -210,3 +210,39 @@ TEST(InplaceStringInit, NullPointerConstructorDeath)
         },
         "contract violation");
 }
+
+// Compile-time (constexpr) evaluation
+
+#if __cplusplus >= 202002L
+
+namespace
+{
+
+constexpr bool constexpr_self_referential_insert()
+{
+    qx::inplace_string<10> s("abc");
+    s.insert(1, s.data(), 2); // source aliases the buffer being shifted
+    return s.compare("aabbc") == 0;
+}
+
+constexpr bool constexpr_self_referential_append()
+{
+    qx::inplace_string<20> s("loop");
+    s.append(s);
+    return s.compare("looploop") == 0;
+}
+
+constexpr bool constexpr_default_and_assign()
+{
+    qx::inplace_string<8> s;
+    s.assign("abc");
+    return s.size() == 3;
+}
+
+} // namespace
+
+static_assert(constexpr_self_referential_insert());
+static_assert(constexpr_self_referential_append());
+static_assert(constexpr_default_and_assign());
+
+#endif

@@ -18,7 +18,9 @@ jobs:
           - { os: windows-2022, toolset: 14.2 }
           - { os: windows-2022, toolset: 14.4 }
           - { os: windows-2025-vs2026, toolset: 14.5 }
-        cpp_std: [17, 20]
+        cpp_std: [17, 20, 23]
+        exclude:
+          - {cfg: {os: windows-2022, toolset: 14.2}, cpp_std: 23}
     
     steps:
       - name: Checkout code
