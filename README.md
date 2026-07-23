@@ -10,6 +10,22 @@ Targets C++20, works in C++17 mode too. Tested against Clang 14/18/20, GCC 11/14
 
 Contiguous iterators (raw pointers, `vector<CharT>`, `array<CharT,_>`, `string`/`string_view` iterators, ...) are detected in C++17 mode and given a `std::memcpy` fast path in append/insert/assign.
 
+## Adding it to your project
+
+This project is header only and can be simply copied into your project. For easy CMake integration, add the following to your `CMakeLists.txt`:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+  qx_inplace_string
+  GIT_REPOSITORY https://github.com/jose-a-sa/inplace_string.git
+  GIT_TAG        v1.0.0 # pin a tag or commit
+)
+FetchContent_MakeAvailable(qx_inplace_string)
+
+target_link_libraries(your_target PRIVATE qx::inplace_string) # adjust to your actual target/component name
+```
+
 ## Usage
 
 ```cpp
@@ -26,16 +42,18 @@ auto value = qx::to_inplace_string<8>(12345);
 
 - **No `operator+`.** For two capacities `N1`/`N2` there's no result capacity that isn't either wasteful (`N1+N2`) or too small for some inputs (`max(N1,N2)`). Due to the ambiguity and to protect the stack from overflowing, prefer `append` and `try_append`.
 - **No allocator parameter.** Nothing to configure since nothing is allocated.
-- **Three way API to mutate the string**, on `append`/`assign`/`insert`/`push_back` (`replace` only has the throwing form):
-    ```cpp
-    s.append("def");           // throws std::length_error if it doesn't fit
-    s.try_append("def");       // returns `this`, or nullptr on failure
-    s.unchecked_append("def"); // caller guarantees it fits, skips the check for tight loops
-    ```
+- **Three way API to mutate the string**, but only on overloads whose sole failure mode is capacity (i.e. `append`/`assign`/`insert`/`push_back`):
+  ```cpp
+  s.append("def");           // throws std::length_error if it doesn't fit
+  s.try_append("def");       // returns `this`, or nullptr on failure
+  s.unchecked_append("def"); // caller guarantees it fits, skips the check
+  ```
+It means that `replace(pos, ...)` has no `try_replace`/`unchecked_replace`, as it can also fail with `std::out_of_range` for a bad `pos`, and a single sentinel return can't tell you which of the two actually happened. try_*/unchecked_* only exist where that ambiguity can't arise.
 - **`substr<Pos, Count>()`** — a compile-time-indexed overload alongside the usual runtime `substr(pos, n)`. Returns a string whose capacity is `Count` (or `N - Pos`), not the full `N` of the source.
-- **Self-aliasing is supported, not UB.** `s.append(s)`, inserting from a pointer into `s`'s own buffer, replacing with a source range that overlaps the destination — all handled correctly.
 - **`std::hash`** matches `std::hash<string_view>` for equal contents, so it's interchangeable with `string`/`string_view` as a map key.
 - Size is stored in the smallest unsigned type that fits `N`; layout follows ordinary struct rules with no forced alignment.
+
+The rest of the API matches `std::string`. Self-aliasing is supported, not UB.  `s.append(s)`, inserting from a pointer into `s`'s own buffer, replacing with a source range that overlaps the destination, is all handled correctly.
 
 ## Hardening
 
