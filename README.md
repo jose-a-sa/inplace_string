@@ -1,45 +1,16 @@
 # inplace_string
 
-`qx::inplace_string` is a fixed-capacity, stack-backed string type that offers a `std::string`-like API without requiring dynamic allocation.
+A fixed-capacity, stack-backed string with a `std::string`-like API and no dynamic allocation. Capacity is a template parameter; anything that would exceed it is handled explicitly instead of triggering a reallocation.
 
-It is designed for code that needs predictable storage, bounded stack usage, and explicit handling of overflow.
+Use it where you want a compile-time size cap, predictable stack usage, and no heap traffic, but still want `append`/`find`/`substr`/etc. to feel like `std::string`.
 
-## Why use it?
+## Compatibility
 
-`qx::inplace_string` is appropriate when the dominant requirement is bounded storage and predictable behavior rather than dynamic growth.
+Targets C++20, works in C++17 mode too. Tested against Clang 14/18/20, GCC 11/14, Apple Clang 15/17/21, and MSVC 14.2/14.4/14.5. `starts_with`/`ends_with` need C++20, `contains` needs C++23 — both just disappear on older standards rather than failing to compile.
 
-Use it when you need:
+Contiguous iterators (raw pointers, `vector<CharT>`, `array<CharT,_>`, `string`/`string_view` iterators, ...) are detected in C++17 mode and given a `std::memcpy` fast path in append/insert/assign.
 
-- a compile-time maximum size
-- no heap allocation
-- predictable stack usage and object size
-- a `std::string`-like interface for common operations
-- explicit handling of capacity overflow
-
-## Motivation and design philosophy
-
-The design objective is the same as for `qx::inplace_vector`: provide a fixed-capacity, allocation-free container for code that values predictable memory behavior over dynamic growth.
-
-`qx::inplace_string` applies that model to character sequences:
-
-- capacity is part of the type
-- storage is local and bounded
-- overflow is explicit rather than implicit
-- the interface remains ergonomic for common use cases
-
-## Support and compatibility
-
-The library is designed around the ISO C++20 model as the primary modern baseline. It also preserves compatibility with C++17 mode for broader adoption and portability.
-
-The repository’s test coverage reflects that support across the main compiler toolchains and STL implementations:
-
-- Ubuntu: Clang/LLVM 14, 18, 20 with libc++/libstdc++, GCC 11, 14 with libstdc++
-- macOS: Apple Clang 15, 17, 21 with libc++
-- Windows: MSVC 14.2, 14.4, and 14.5
-
-In practice, this means the implementation aims to be both modern and portable, while still remaining usable in C++17 mode. It also includes explicit detection of contiguous iterators so that range-based append and insert operations can take the most efficient path on the tested standard library implementations.
-
-## Basic usage
+## Usage
 
 ```cpp
 #include <qx/inplace_string.h>
@@ -51,57 +22,48 @@ text += "!";
 auto value = qx::to_inplace_string<8>(12345);
 ```
 
-## API overview
+## Where it differs from std::string
 
-### Support level compared to `std::string`
+- **No `operator+`.** For two capacities `N1`/`N2` there's no result capacity that isn't either wasteful (`N1+N2`) or too small for some inputs (`max(N1,N2)`). Due to the ambiguity and to protect the stack from overflowing, prefer `append` and `try_append`.
+- **No allocator parameter.** Nothing to configure since nothing is allocated.
+- **Three way API to mutate the string**, on `append`/`assign`/`insert`/`push_back` (`replace` only has the throwing form):
+    ```cpp
+    s.append("def");           // throws std::length_error if it doesn't fit
+    s.try_append("def");       // returns `this`, or nullptr on failure
+    s.unchecked_append("def"); // caller guarantees it fits, skips the check for tight loops
+    ```
+- **`substr<Pos, Count>()`** — a compile-time-indexed overload alongside the usual runtime `substr(pos, n)`. Returns a string whose capacity is `Count` (or `N - Pos`), not the full `N` of the source.
+- **Self-aliasing is supported, not UB.** `s.append(s)`, inserting from a pointer into `s`'s own buffer, replacing with a source range that overlaps the destination — all handled correctly.
+- **`std::hash`** matches `std::hash<string_view>` for equal contents, so it's interchangeable with `string`/`string_view` as a map key.
+- Size is stored in the smallest unsigned type that fits `N`; layout follows ordinary struct rules with no forced alignment.
 
-`qx::inplace_string` is intended to provide the same API surface as `std::string` for the common case, but any operation that would exceed the fixed capacity is handled explicitly. In the throwing interface, such operations raise `std::length_error("qx::inplace_string")`.
+## Hardening
 
-### Intentional differences
-
-Compared with `std::string`, `qx::inplace_string` differs in a few important ways:
-
-- fixed capacity: the maximum size is known at compile time
-- no dynamic growth: operations that would exceed capacity are handled explicitly
-- no allocator model: there is no heap growth or allocator customization
-- no general-purpose `std::string` feature set: it targets the common core rather than every corner case
-- explicit overflow behavior: the API exposes throwing, checked, and unchecked variants where appropriate
-- `operator+` is intentionally omitted because its result capacity would be ambiguous and potentially undesirable in a bounded container
-
-### Checked and unchecked mutation APIs
-
-Beyond the usual string operations, the library also provides checked variants for mutating operations that may exceed the fixed capacity. These are the intended counterparts to the standard mutators when the caller wants to avoid silent overflow:
+Precondition checks — null pointers, out-of-range indices, invalid iterator pairs — are gated behind two macros, both off by default:
 
 ```cpp
-qx::inplace_string<16> s = "abc";
-
-s.try_append("def");      // returns `this` on success, nullptr on failure
-s.try_insert(3, "xyz");
-s.try_assign("hello");
-s.try_push_back('!');
+#define QX_HARDENING_MODE QX_HARDENING_MODE_ALL   // turns contract checks on at all
+#define QX_ASSERT_MODE    QX_ASSERT_MODE_LOG_TRAP // what happens when one fails (this is the default once hardening is on)
+#include <qx/inplace_string.h>
 ```
 
-The pattern is the same throughout the API:
+or from the command line:
 
-- the regular mutating functions perform the operation directly and rely on the caller to ensure the requested growth fits
-- the `try_*` variants report whether the operation could be completed without exceeding capacity
-- the `unchecked_*` variants are for trusted contexts where the caller already knows the target buffer is large enough and wants to avoid the extra checking cost
-
-In the current header, the checked and unchecked mutation family covers append, assign, insert, and push-back operations. There are no `try_replace` or `unchecked_replace` overloads in the present implementation.
-
-## Conversion helpers
-
-A particularly useful part of the API is the family of numeric conversion helpers:
-
-```cpp
-auto s1 = qx::to_inplace_string(42);
-auto s2 = qx::to_inplace_string<16>(123456);
-auto s3 = qx::try_to_inplace_string<4>(1000);      // returns std::nullopt if it does not fit
-auto s4 = qx::unchecked_to_inplace_string<8>(42); // assumes capacity is sufficient
+```
+-DQX_HARDENING_MODE=QX_HARDENING_MODE_ALL -DQX_ASSERT_MODE=QX_ASSERT_MODE_LOG_TRAP
 ```
 
-These helpers are intentionally differentiated:
+`QX_ASSERT_MODE` picks the failure behavior: `NONE` (0), `TRAP` (1, silent trap), `LOG_TRAP` (2, log to stderr then trap — the default), `ABORT` (3), `LOG_ABORT` (4). With hardening off, all of this compiles away to nothing, so there's no reason not to turn it on for debug/test builds.
 
-- `to_inplace_string<Capacity>(value)` throws `std::length_error` if the formatted value does not fit in the requested capacity
-- `try_to_inplace_string<Capacity>(value)` returns `std::optional<inplace_string<Capacity>>` and is the safe choice when the caller wants to test fit without throwing
-- `unchecked_to_inplace_string<Capacity>(value)` is for trusted contexts where the caller already knows the buffer is large enough; it avoids the overhead of checking and is useful in performance-sensitive code paths
+This is unrelated to `try_*`/`unchecked_*` above — that's about capacity, which is data-dependent; hardening is about catching caller bugs.
+
+## Comparing to other fixed-capacity strings
+
+|                         | inplace_string                          | Boost.StaticString                        | ETL string                                                   |
+| ----------------------- | --------------------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
+| overflow                | throws                                  | throws                                    | **truncates** by default, with a propagating truncation flag |
+| checked/unchecked calls | `try_*`/`unchecked_*` per call          | throwing only                             | truncate-vs-error is a compile-time policy, not per-call     |
+| `operator+`             | no                                      | not a member (append/`+=` instead)        | no                                                           |
+| substring               | `substr(pos,n)` + `substr<Pos,Count>()` | `substr()` + `subview()` (returns a view) | view-based, via `etl::string_view`                           |
+
+Boost.StaticString is the closer `std::string` clone — broader API, no capacity-checking tier of its own. ETL truncates by default, which fits environments where exceptions aren't available at all. This library keeps throwing as the default (so overflow never passes silently) but makes checking a per-call choice via `try_*`/`unchecked_*`, rather than an exceptions-on/exceptions-off global switch.
