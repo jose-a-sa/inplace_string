@@ -2089,7 +2089,7 @@ private:
     // string (N) to save space. It is guaranteed to be large enough to store any size up to N, and it is an unsigned
     // integer type for simplicity of implementation.
     template <class SizeT, class ChT, std::size_t M>
-    struct alignas(size_type) inplace_string_storage
+    struct inplace_string_storage
     {
         union // NOLINT(*-non-private-member-variables-in-classes)
         {
