@@ -1,87 +1,146 @@
-# inplace_string
+# `qx::inplace_string`
 
-A fixed-capacity, stack-backed string with a `std::string`-like API and no dynamic allocation. Capacity is a template parameter; anything that would exceed it is handled explicitly instead of triggering a reallocation.
-
-Use it where you want a compile-time size cap, predictable stack usage, and no heap traffic, but still want `append`/`find`/`substr`/etc. to feel like `std::string`.
+A fixed-capacity, stack-backed string for modern C++ with zero dynamic memory allocation and a `std::string`-compatible interface.
 
 ## Compatibility
 
-Targets C++20, works in C++17 mode too. Tested against Clang 14/18/20, GCC 11/14, Apple Clang 15/17/21, and MSVC 14.2/14.4/14.5. `starts_with`/`ends_with` need C++20, `contains` needs C++23 — both just disappear on older standards rather than failing to compile.
+* **Language Standard:** C++20 (fully supported with C++17 backwards compatibility).
+  * *Note:* `starts_with`/`ends_with` require C++20; `contains` requires C++23. They conditionally compile depending on the active standard.
+* **Compilers Tested:**
+  * Clang 14, 18, 20
+  * GCC 11, 14
+  * Apple Clang 15, 17, 21
+  * MSVC 14.2 (VS 2019), 14.4 (VS 2022), 14.5
 
-Contiguous iterators (raw pointers, `vector<CharT>`, `array<CharT,_>`, `string`/`string_view` iterators, ...) are detected in C++17 mode and given a `std::memcpy` fast path in append/insert/assign.
+## Integration
 
-## Adding it to your project
+This library is header-only and can be copied directly into your project or fetched via CMake.
 
-This project is header only and can be simply copied into your project. For easy CMake integration, add the following to your `CMakeLists.txt`:
+### CMake FetchContent
 
 ```cmake
 include(FetchContent)
+
 FetchContent_Declare(
   qx_inplace_string
   GIT_REPOSITORY https://github.com/jose-a-sa/inplace_string.git
-  GIT_TAG        v1.0.0 # pin a tag or commit
+  GIT_TAG        v1.0.0
 )
 FetchContent_MakeAvailable(qx_inplace_string)
 
-target_link_libraries(your_target PRIVATE qx::inplace_string) # adjust to your actual target/component name
+target_link_libraries(your_target PRIVATE qx::inplace_string)
 ```
 
-## Usage
+## Quick Start
 
 ```cpp
 #include <qx/inplace_string.h>
+#include <iostream>
 
-qx::inplace_string<32> text = "hello";
-text.append(" world");
-text += "!";
+int main() {
+    // Basic usage
+    qx::inplace_string<32> text = "Hello";
+    text.append(" World");
+    text += "!";
 
-auto value = qx::to_inplace_string<8>(12345);
+    // Number conversion
+    auto num_str = qx::to_inplace_string<8>(12345);
+
+    // Substring with exact compile-time capacity sizing
+    auto sub = text.substr<0, 5>(); // Returns inplace_string<5> ("Hello")
+
+    std::cout << text << " | Sub: " << sub << '\n';
+}
 ```
 
-## Where it differs from std::string
+## Configuration Macros
 
-- **No `operator+`.** For two capacities `N1`/`N2` there's no result capacity that isn't either wasteful (`N1+N2`) or too small for some inputs (`max(N1,N2)`). Due to the ambiguity and to protect the stack from overflowing, prefer `append` and `try_append`.
-- **No allocator parameter.** Nothing to configure since nothing is allocated.
-- **Three way API to mutate the string**, but only on overloads whose sole failure mode is capacity (i.e. `append`/`assign`/`insert`/`push_back`):
-  ```cpp
-  s.append("def");           // throws std::length_error if it doesn't fit
-  s.try_append("def");       // returns `this`, or nullptr on failure
-  s.unchecked_append("def"); // caller guarantees it fits, skips the check
-  ```
-It means that `replace(pos, ...)` has no `try_replace`/`unchecked_replace`, as it can also fail with `std::out_of_range` for a bad `pos`, and a single sentinel return can't tell you which of the two actually happened. try_*/unchecked_* only exist where that ambiguity can't arise.
-- **`substr<Pos, Count>()`** — a compile-time-indexed overload alongside the usual runtime `substr(pos, n)`. Returns a string whose capacity is `Count` (or `N - Pos`), not the full `N` of the source.
-- **`std::hash`** matches `std::hash<string_view>` for equal contents, so it's interchangeable with `string`/`string_view` as a map key.
-- Size is stored in the smallest unsigned type that fits `N`; layout follows ordinary struct rules with no forced alignment.
+`qx::inplace_string` offers compile-time toggles to tune safety, binary footprint, and copy semantics.
 
-The rest of the API matches `std::string`. Self-aliasing is supported, not UB.  `s.append(s)`, inserting from a pointer into `s`'s own buffer, replacing with a source range that overlaps the destination, is all handled correctly.
+### Trivial Copyability Threshold (`QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD`)
 
-## Hardening
-
-Precondition checks — null pointers, out-of-range indices, invalid iterator pairs — are gated behind two macros, both off by default:
+By default, `inplace_string` maintains non-trivial copy operations to closely mirror standard string semantics. Defining `QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD` sets the maximum buffer capacity (in bytes) for which `inplace_string<N>` is made trivially copyable.
 
 ```cpp
-#define QX_HARDENING_MODE QX_HARDENING_MODE_ALL   // turns contract checks on at all
-#define QX_ASSERT_MODE    QX_ASSERT_MODE_LOG_TRAP // what happens when one fails (this is the default once hardening is on)
+#define QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD 64
+#include <qx/inplace_string.h>
+
+static_assert(std::is_trivially_copyable_v<qx::inplace_string<30>>); // 32 bytes
+static_assert(std::is_trivially_copyable_v<qx::inplace_string<62>>); // 64 bytes
+```
+
+Controls the balance between copying all bytes via a trivial versus copying only active bytes. For small capacities below the threshold, trivially copying the entire `qx::inplace_string<N>` layout via bitwise copy is fast and enables POD/C-struct compatibility. For larger capacities above the threshold, non-trivial copy operations are preferred so that only active characters up to `size()` are copied via `std::char_traits::copy`, avoiding unnecessary overhead from copying unused trailing capacity.
+
+### Disabling `operator+` Stack Expansion (`QX_INPLACE_STRING_NO_OPERATOR_PLUS`)
+By default, adding two `inplace_string` instances (`a + b`) creates a new `inplace_string<N + M>` at compile time. If you wish to prevent implicit stack growth or template code bloat from returning value types of capacity `N+M`, define `QX_INPLACE_STRING_NO_OPERATOR_PLUS`.
+
+```cpp
+#define QX_INPLACE_STRING_NO_OPERATOR_PLUS
 #include <qx/inplace_string.h>
 ```
 
-or from the command line:
+* **What stays enabled:** Overloads returning `std::string` (e.g., `inplace_string + std::string` or `inplace_string + std::string_view`) remain available for interoperability.
+* **What is disabled:** Overloads returning `inplace_string<N + M>` (e.g., `inplace_string + inplace_string`, `inplace_string + char`, `inplace_string + &char[M]`). This encourages using explicit `.append()`, `.try_append()`, or `+=` operations.
 
+### Hardening & Contract Checks
+
+Runtime precondition checks (null pointers, out-of-bounds indices, invalid iterator ranges) can be configured globally:
+
+| Macro               | Options / Default                                                                                                                             | Description                                                 |
+| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------- |
+| `QX_HARDENING_MODE` | `QX_HARDENING_MODE_OFF` (Default)<br>`QX_HARDENING_MODE_ALL`                                                                                  | Enables precondition checks across all API boundaries.      |
+| `QX_ASSERT_MODE`    | `QX_ASSERT_MODE_LOG_TRAP` (Default)<br>`QX_ASSERT_MODE_NONE`<br>`QX_ASSERT_MODE_TRAP`<br>`QX_ASSERT_MODE_ABORT`<br>`QX_ASSERT_MODE_LOG_ABORT` | Defines failure action when a hardening assertion triggers. |
+
+```cpp
+// Example: Hardened Debug Build
+#define QX_HARDENING_MODE QX_HARDENING_MODE_ALL
+#define QX_ASSERT_MODE    QX_ASSERT_MODE_LOG_TRAP
+#include <qx/inplace_string.h>
 ```
--DQX_HARDENING_MODE=QX_HARDENING_MODE_ALL -DQX_ASSERT_MODE=QX_ASSERT_MODE_LOG_TRAP
+
+When hardening is turned off (`QX_HARDENING_MODE_OFF`), all checks compile away entirely with zero runtime overhead.
+
+## API Design & Differences from `std::string`
+
+### Three-tiered mutation API
+
+For methods whose **only** failure mode is running out of capacity (such as `append`, `assign`, `insert`, and `push_back`), three distinct calling patterns are provided:
+
+```cpp
+qx::inplace_string<8> str = "abc";
+
+// Throwing tier (Standard behavior)
+str.append("def");           // Throws std::length_error on capacity overflow
+
+// Non-Throwing / Checked tier
+if (!str.try_append("ghi")) { // Returns `this` pointer on success, nullptr on overflow
+    // Handle overflow gracefully without exceptions
+}
+
+// Unchecked tier (Fast path)
+str.unchecked_append("xyz"); // Precondition: caller guarantees space. Skips bounds checks.
 ```
 
-`QX_ASSERT_MODE` picks the failure behavior: `NONE` (0), `TRAP` (1, silent trap), `LOG_TRAP` (2, log to stderr then trap — the default), `ABORT` (3), `LOG_ABORT` (4). With hardening off, all of this compiles away to nothing, so there's no reason not to turn it on for debug/test builds.
+> *Note:* Methods like `replace` do not offer `try_*` / `unchecked_*` variants because they can also fail with `std::out_of_range` for invalid positions. Tiered calls are restricted to capacity-only failures to eliminate error-code ambiguity.
 
-This is unrelated to `try_*`/`unchecked_*` above — that's about capacity, which is data-dependent; hardening is about catching caller bugs.
+### Substring capacity sizing
 
-## Comparing to other fixed-capacity strings
+Standard `std::string::substr` requires dynamic allocation. `qx::inplace_string` provides two options:
+* `substr(pos, n)`: Runtime overload returning `inplace_string<N>` (preserves original capacity).
+* `substr<Pos, Count>()`: Compile-time template overload returning `inplace_string<Count>`, minimizing stack footprint.
 
-|                         | inplace_string                          | Boost.StaticString                        | ETL string                                                   |
-| ----------------------- | --------------------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
-| overflow                | throws                                  | throws                                    | **truncates** by default, with a propagating truncation flag |
-| checked/unchecked calls | `try_*`/`unchecked_*` per call          | throwing only                             | truncate-vs-error is a compile-time policy, not per-call     |
-| `operator+`             | no                                      | not a member (append/`+=` instead)        | no                                                           |
-| substring               | `substr(pos,n)` + `substr<Pos,Count>()` | `substr()` + `subview()` (returns a view) | view-based, via `etl::string_view`                           |
+## Feature comparison
 
-Boost.StaticString is the closer `std::string` clone — broader API, no capacity-checking tier of its own. ETL truncates by default, which fits environments where exceptions aren't available at all. This library keeps throwing as the default (so overflow never passes silently) but makes checking a per-call choice via `try_*`/`unchecked_*`, rather than an exceptions-on/exceptions-off global switch.
+| Feature                        | `qx::inplace_string`                                         | `boost::static_string`                | `etl::string`                        |
+| :----------------------------- | :----------------------------------------------------------- | :------------------------------------ | :----------------------------------- |
+| **Overflow Behavior**          | Throws `std::length_error`                                   | Throws `std::length_error`            | **Truncates** by default (sets flag) |
+| **Checked / Unchecked API**    | Per-call (`try_*` / `unchecked_*`)                           | Throwing only                         | Global compile-time policy           |
+| **Trivial Copyability Toggle** | Threshold-based (`QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD`) | No                                    | No                                   |
+| **Disable `operator+` Toggle** | Yes (`QX_INPLACE_STRING_NO_OPERATOR_PLUS`)                   | N/A (Only `+=` / `append`)            | No `operator+`                       |
+| **Compile-Time Substring**     | Yes (`substr<Pos, Count>()`)                                 | View-based (`subview()`)              | View-based (`etl::string_view`)      |
+| **`std::hash` Compatibility**  | Matches `std::hash<std::string_view>`                        | Matches `std::hash<std::string_view>` | Custom ETL hash                      |
+
+
+## License
+
+Distributed under the MIT License. See `LICENSE` for details.

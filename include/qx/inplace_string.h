@@ -21,8 +21,8 @@
 #include <type_traits>
 
 // Number of bytes to switch from a trivially copyable to a non-trivially copyable qx::inplace_string.
-#ifndef QX_INPLACE_STRING_TRIVIALLY_COPY_THRESHOLD
-#define QX_INPLACE_STRING_TRIVIALLY_COPY_THRESHOLD 0
+#ifndef QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD
+#define QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD 0
 #endif
 
 // contract hardening level (0: none, 1: all, default: debug-only)
@@ -2142,7 +2142,7 @@ private:
 
     template <class SizeT, class ChT, std::size_t M>
     using inplace_string_storage =
-        std::conditional_t<inplace_string_storage_size_v<SizeT, ChT, M> <= QX_INPLACE_STRING_TRIVIALLY_COPY_THRESHOLD,
+        std::conditional_t<inplace_string_storage_size_v<SizeT, ChT, M> <= QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD,
             inplace_string_storage_trivial<SizeT, ChT, M>,
             inplace_string_storage_nontrivial<SizeT, ChT, M>>;
 
