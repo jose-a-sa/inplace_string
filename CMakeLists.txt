@@ -14,9 +14,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-# ==============================================================================
+
 # Component Registration
-# ==============================================================================
+
 set(PROJECT_NAMESPACE qx)
 set(PROJECT_COMPONENTS)
 
@@ -37,9 +37,9 @@ function(qx_register_component target name)
   set(PROJECT_COMPONENTS ${PROJECT_COMPONENTS} ${name} PARENT_SCOPE)
 endfunction()
 
-# ==============================================================================
+
 # inplace_string
-# ==============================================================================
+
 add_library(qx_inplace_string INTERFACE)
 target_compile_features(qx_inplace_string INTERFACE cxx_std_17)
 target_sources(qx_inplace_string
@@ -50,9 +50,9 @@ target_sources(qx_inplace_string
 )
 qx_register_component(qx_inplace_string inplace_string)
 
-# ==============================================================================
+
 # Testing & Benchmark
-# ==============================================================================
+
 option(QX_BUILD_TESTS "Build tests for qxlib" ${PROJECT_IS_TOP_LEVEL})
 option(QX_BUILD_BENCHMARKS "Build benchmarks for qxlib" ${PROJECT_IS_TOP_LEVEL})
 
@@ -65,9 +65,9 @@ if(QX_BUILD_BENCHMARKS)
   add_subdirectory(bench)
 endif()
 
-# ==============================================================================
+
 # Package Config
-# ==============================================================================
+
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake.in" [=[
 @PACKAGE_INIT@
 

@@ -20,6 +20,11 @@
 #include <string_view>
 #include <type_traits>
 
+// Number of bytes to switch from a trivially copyable to a non-trivially copyable qx::inplace_string.
+#ifndef QX_INPLACE_STRING_TRIVIALLY_COPY_THRESHOLD
+#define QX_INPLACE_STRING_TRIVIALLY_COPY_THRESHOLD 0
+#endif
+
 // contract hardening level (0: none, 1: all, default: debug-only)
 #ifndef QX_HARDENING_MODE_NONE
 #define QX_HARDENING_MODE_NONE 0
@@ -104,6 +109,14 @@
 #endif
 #endif
 
+#ifndef QX_CONSTEXPR_CXX23
+#if __cplusplus >= 202302L
+#define QX_CONSTEXPR_CXX23 constexpr
+#else
+#define QX_CONSTEXPR_CXX23
+#endif
+#endif
+
 #ifndef QX_FORCE_INLINE
 #if defined(__GNUC__) || defined(__clang__)
 #define QX_FORCE_INLINE inline __attribute__((always_inline))
@@ -165,6 +178,21 @@ namespace qx
 
 namespace intl
 {
+
+// std::type_identity (C++20)
+
+#if __cplusplus >= 202002L
+using std::type_identity;
+using std::type_identity_t;
+#else
+template <class T>
+struct type_identity
+{
+    using type = T;
+};
+template <class T>
+using type_identity_t = typename type_identity<T>::type;
+#endif // __cplusplus >= 202002L
 
 // std::remove_cvref (C++20)
 
@@ -598,7 +626,7 @@ public:
     QX_CONSTEXPR_CXX20 basic_inplace_string(CharT const* str) // NOLINT(*-explicit-constructor, *-explicit-conversions)
         : basic_inplace_string()
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string(ptr) detected nullptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string(ptr) detected nul lptr");
         init(str, traits_type::length(str));
     }
 
@@ -623,19 +651,6 @@ public:
     {
         init(begin, end);
     }
-
-    // struct init_with_sentinel_tag
-    // {};
-
-    // template <class Iterator, class Sentinel>
-    // constexpr basic_inplace_string(init_with_sentinel_tag /* tag */, Iterator
-    // begin, Sentinel end) noexcept
-    // {
-    //     init_with_sentinel(begin, end);
-    // }
-
-    // template <ContainerCompatibleRange<CharT> R>
-    // constexpr basic_inplace_string(std::from_range_t, R&& rg); // since C++23
 
     QX_CONSTEXPR_CXX20 basic_inplace_string(std::initializer_list<CharT> il)
         : basic_inplace_string()
@@ -684,10 +699,8 @@ public:
 
     [[nodiscard]] constexpr size_type size() const noexcept { return rep_.size; }
     [[nodiscard]] constexpr size_type length() const noexcept { return rep_.size; }
-    // ReSharper disable once CppMemberFunctionMayBeStatic
-    [[nodiscard]] constexpr size_type max_size() const noexcept { return N; }
-    // ReSharper disable once CppMemberFunctionMayBeStatic
-    [[nodiscard]] constexpr size_type capacity() const noexcept { return N; }
+    [[nodiscard]] static constexpr size_type max_size() noexcept { return N; }
+    [[nodiscard]] static constexpr size_type capacity() noexcept { return N; }
 
     void resize(size_type n, CharT c)
     {
@@ -714,15 +727,13 @@ public:
         erase_to_end(std::move(op)(data(), n));
     }
 
-    // ReSharper disable once CppMemberFunctionMayBeConst
-    void reserve(size_type n)
+    static void reserve(size_type n)
     {
         if (n > max_size())
             throw_out_of_capacity();
     }
 
-    // ReSharper disable once CppMemberFunctionMayBeStatic
-    void shrink_to_fit() noexcept { /* nop */ }
+    static void shrink_to_fit() noexcept { /* nop */ }
 
     QX_CONSTEXPR_CXX20 void clear() noexcept { set_size_and_null_terminate(0); }
 
@@ -910,9 +921,6 @@ public:
         return unchecked_append(il.begin(), il.size());
     }
 
-    // template <ContainerCompatibleRange<CharT> R>
-    // constexpr basic_inplace_string* unchecked_append_range(R&& rg); // C++23
-
     // try_append
 
     QX_CONSTEXPR_CXX20 basic_inplace_string* try_append(basic_inplace_string const& str) noexcept
@@ -1083,9 +1091,6 @@ public:
     }
 
     QX_CONSTEXPR_CXX20 basic_inplace_string& assign(std::initializer_list<CharT> il) { return assign(il.begin(), il.size()); }
-
-    // template <ContainerCompatibleRange<CharT> R>
-    // constexpr basic_inplace_string& assign_range(R&& rg);            // C++23
 
     // unchecked_assign
 
@@ -1273,9 +1278,6 @@ public:
     }
 
     QX_CONSTEXPR_CXX20 iterator insert(const_iterator pos, std::initializer_list<CharT> il) { return insert(pos, il.begin(), il.end()); }
-
-    // template <ContainerCompatibleRange<CharT> R>
-    // constexpr iterator insert_range(const_iterator p, R&& rg);            // C++23
 
     // unchecked_insert
 
@@ -1623,9 +1625,6 @@ public:
         basic_inplace_string const tmp(j1, j2);
         return replace(i1, i2, tmp);
     }
-
-    // template <ContainerCompatibleRange<CharT> R>
-    // constexpr basic_inplace_string& replace_with_range(const_iterator i1, const_iterator i2, R&& rg); // C++23
 
     QX_CONSTEXPR_CXX20 basic_inplace_string& replace(const_iterator it1, const_iterator it2, std::initializer_list<CharT> il)
     {
@@ -2089,7 +2088,7 @@ private:
     // string (N) to save space. It is guaranteed to be large enough to store any size up to N, and it is an unsigned
     // integer type for simplicity of implementation.
     template <class SizeT, class ChT, std::size_t M>
-    struct inplace_string_storage
+    struct inplace_string_storage_trivial
     {
         union // NOLINT(*-non-private-member-variables-in-classes)
         {
@@ -2098,8 +2097,54 @@ private:
         };
         ChT data[M + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
 
-        constexpr inplace_string_storage() noexcept { data[0] = ChT{}; } // NOTE: to avoid full buffer init
+        constexpr inplace_string_storage_trivial() noexcept { data[0] = ChT{}; } // NOTE: to avoid full buffer init
     };
+
+    template <class SizeT, class ChT, std::size_t M>
+    struct inplace_string_storage_nontrivial
+    {
+        union // NOLINT(*-non-private-member-variables-in-classes)
+        {
+            SizeT size{};
+            ChT pad; //< ensures similar layout to libc++ short representation
+        };
+        ChT data[M + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
+
+        constexpr inplace_string_storage_nontrivial() noexcept { data[0] = ChT{}; }
+
+        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial(inplace_string_storage_nontrivial const& other) noexcept { assign(other); }
+
+        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& operator=(inplace_string_storage_nontrivial const& other) noexcept
+        {
+            return this == &other ? *this : assign(other);
+        }
+
+        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial(inplace_string_storage_nontrivial&& other) noexcept { assign(other); }
+
+        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& operator=(inplace_string_storage_nontrivial&& other) noexcept
+        {
+            return this == &other ? *this : assign(other);
+        }
+
+        QX_CONSTEXPR_CXX20 ~inplace_string_storage_nontrivial() noexcept = default;
+
+        template <class Other>
+        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& assign(Other const& other) noexcept
+        {
+            size = other.size;                             // NOLINT(*-union-access)
+            traits_type::copy(data, other.data, size + 1); // NOLINT(*-union-access)
+            return *this;
+        }
+    };
+
+    template <class SizeT, class ChT, std::size_t M>
+    static constexpr auto inplace_string_storage_size_v = sizeof(inplace_string_storage_trivial<SizeT, ChT, M>);
+
+    template <class SizeT, class ChT, std::size_t M>
+    using inplace_string_storage =
+        std::conditional_t<inplace_string_storage_size_v<SizeT, ChT, M> <= QX_INPLACE_STRING_TRIVIALLY_COPY_THRESHOLD,
+            inplace_string_storage_trivial<SizeT, ChT, M>,
+            inplace_string_storage_nontrivial<SizeT, ChT, M>>;
 
     // internal type used to store the size information, automatically changes between capacities
     using compressed_size_type = intl::min_size_t<N>;
@@ -2326,13 +2371,13 @@ private:
     }
 
     template <std::size_t M, class T, std::enable_if_t<std::is_arithmetic_v<T>, int>>
-    friend inplace_string<M> to_inplace_string(T);
+    friend QX_CONSTEXPR_CXX23 inplace_string<M> to_inplace_string(T);
 
     template <std::size_t M, class T, std::enable_if_t<std::is_arithmetic_v<T>, int>>
-    friend std::optional<inplace_string<M>> try_to_inplace_string(T) noexcept;
+    friend QX_CONSTEXPR_CXX23 std::optional<inplace_string<M>> try_to_inplace_string(T) noexcept;
 
     template <std::size_t M, class T, std::enable_if_t<std::is_arithmetic_v<T>, int>>
-    friend inplace_string<M> unchecked_to_inplace_string(T) noexcept;
+    friend QX_CONSTEXPR_CXX23 inplace_string<M> unchecked_to_inplace_string(T) noexcept;
 };
 
 template <std::size_t N, class CharT, class Traits, std::size_t M>
@@ -2482,29 +2527,117 @@ inline bool operator>=(CharT const* lhs, basic_inplace_string<N, CharT, Traits> 
 
 // operator +
 
-/*
- * NOTE: operator+ is intentionally omitted for basic_inplace_string<N, CharT,
- * Traits>.
- *
- * Rationale:
- *  - Memory Safety: Unlike std::string, inplace_string<N> does not have a
- *    dynamic allocator. Implementing operator+ would require an arbitrary
- *    choice of result capacity (e.g., N, M, or N+M).
- *
- *  - Stack Protection: Returning inplace_string<N+M> can lead to "stack
- *    blowup" during chained concatenations (e.g., s1 + s2 + s3 + s4),
- *    creating large, hidden temporaries that risk stack overflow in
- *    memory-constrained environments.
- *
- *  - Performance: Implicit temporaries and potential template bloat from
- *    N+M type instantiations contradict the "zero-overhead" goals of
- *    inplace strings.
- *
- * Recommended Alternatives:
- *  - Use .append() or operator+= to build strings in a pre-allocated buffer.
- *  - Use format or a dedicated builder pattern if complex
- *    concatenation is required.
- */
+#ifndef QX_INPLACE_STRING_NO_OPERATOR_PLUS
+
+// inplace + inplace
+template <std::size_t N, class CharT, class Traits, std::size_t M>
+inline QX_CONSTEXPR_CXX20 auto operator+(qx::basic_inplace_string<N, CharT, Traits> const& lhs,
+    qx::basic_inplace_string<M, CharT, Traits> const& rhs) noexcept -> qx::basic_inplace_string<N + M, CharT, Traits>
+{
+    return qx::basic_inplace_string<N + M, CharT, Traits>(lhs).unchecked_append(rhs);
+}
+
+// inplace + literal
+template <std::size_t N, class CharT, class Traits, std::size_t M>
+inline QX_CONSTEXPR_CXX20 auto operator+(qx::basic_inplace_string<N, CharT, Traits> const& lhs, CharT const (&rhs)[M]) noexcept
+    -> qx::basic_inplace_string<N + M - 1, CharT, Traits>
+{
+    return qx::basic_inplace_string<N + M - 1, CharT, Traits>(lhs).unchecked_append(rhs, M - 1);
+}
+
+// literal + inplace
+template <std::size_t N, class CharT, class Traits, std::size_t M>
+inline QX_CONSTEXPR_CXX20 auto operator+(CharT const (&lhs)[M], qx::basic_inplace_string<N, CharT, Traits> const& rhs) noexcept
+    -> qx::basic_inplace_string<N + M - 1, CharT, Traits>
+{
+    return qx::basic_inplace_string<N + M - 1, CharT, Traits>(lhs).unchecked_append(rhs);
+}
+
+// inplace + char
+template <std::size_t N, class CharT, class Traits>
+inline QX_CONSTEXPR_CXX20 auto operator+(qx::basic_inplace_string<N, CharT, Traits> const& lhs, CharT rhs) noexcept
+    -> qx::basic_inplace_string<N + 1, CharT, Traits>
+{
+    qx::basic_inplace_string<N + 1, CharT, Traits> res(lhs);
+    res.push_back(rhs);
+    return res;
+}
+
+// char + inplace
+template <std::size_t N, class CharT, class Traits>
+inline QX_CONSTEXPR_CXX20 auto operator+(CharT lhs, qx::basic_inplace_string<N, CharT, Traits> const& rhs) noexcept
+    -> qx::basic_inplace_string<N + 1, CharT, Traits>
+{
+    qx::basic_inplace_string<N + 1, CharT, Traits> res;
+    res.push_back(lhs);
+    return res.unchecked_append(rhs);
+}
+
+#endif // QX_INPLACE_STRING_NO_OPERATOR_PLUS
+
+// inplace + std::string const&
+template <std::size_t N, class CharT, class Traits, class Alloc>
+inline QX_CONSTEXPR_CXX20 auto operator+(qx::basic_inplace_string<N, CharT, Traits> const& lhs,
+    std::basic_string<CharT, Traits, Alloc> const& rhs) -> std::basic_string<CharT, Traits, Alloc>
+{
+    std::basic_string<CharT, Traits, Alloc> res;
+    res.reserve(lhs.size() + rhs.size());
+    res.append(lhs.data(), lhs.size());
+    res.append(rhs);
+    return res;
+}
+
+// std::string const& + inplace
+template <std::size_t N, class CharT, class Traits, class Alloc>
+inline QX_CONSTEXPR_CXX20 auto operator+(std::basic_string<CharT, Traits, Alloc> const& lhs,
+    qx::basic_inplace_string<N, CharT, Traits> const& rhs) -> std::basic_string<CharT, Traits, Alloc>
+{
+    std::basic_string<CharT, Traits, Alloc> res;
+    res.reserve(lhs.size() + rhs.size());
+    res.append(lhs);
+    res.append(rhs.data(), rhs.size());
+    return res;
+}
+
+// inplace + std::string&&
+template <std::size_t N, class CharT, class Traits, class Alloc>
+inline QX_CONSTEXPR_CXX20 auto operator+(qx::basic_inplace_string<N, CharT, Traits> const& lhs,
+    std::basic_string<CharT, Traits, Alloc>&& rhs) -> std::basic_string<CharT, Traits, Alloc>
+{
+    return std::move(rhs.insert(0, lhs.data(), lhs.size()));
+}
+
+// std::string&& + inplace
+template <std::size_t N, class CharT, class Traits, class Alloc>
+inline QX_CONSTEXPR_CXX20 auto operator+(std::basic_string<CharT, Traits, Alloc>&& lhs,
+    qx::basic_inplace_string<N, CharT, Traits> const& rhs) -> std::basic_string<CharT, Traits, Alloc>
+{
+    return std::move(lhs.append(rhs.data(), rhs.size()));
+}
+
+// inplace + std::basic_string_view
+template <std::size_t N, class CharT, class Traits>
+inline QX_CONSTEXPR_CXX20 auto operator+(qx::basic_inplace_string<N, CharT, Traits> const& lhs,
+    qx::intl::type_identity_t<std::basic_string_view<CharT, Traits>> rhs) -> std::basic_string<CharT, Traits>
+{
+    std::basic_string<CharT, Traits> res;
+    res.reserve(lhs.size() + rhs.size());
+    res.append(lhs.data(), lhs.size());
+    res.append(rhs.data(), rhs.size());
+    return res;
+}
+
+// std::basic_string_view + inplace
+template <std::size_t N, class CharT, class Traits>
+inline QX_CONSTEXPR_CXX20 auto operator+(qx::intl::type_identity_t<std::basic_string_view<CharT, Traits>> lhs,
+    qx::basic_inplace_string<N, CharT, Traits> const& rhs) -> std::basic_string<CharT, Traits>
+{
+    std::basic_string<CharT, Traits> res;
+    res.reserve(lhs.size() + rhs.size());
+    res.append(lhs.data(), lhs.size());
+    res.append(rhs.data(), rhs.size());
+    return res;
+}
 
 // swap
 
@@ -2514,21 +2647,8 @@ inline QX_CONSTEXPR_CXX20 void swap(basic_inplace_string<N, CharT, Traits>& lhs,
     lhs.swap(rhs);
 }
 
-// int stoi(string const& __str, size_t* __idx = nullptr, int __base = 10);
-// long stol(string const& __str, size_t* __idx = nullptr, int __base = 10);
-// unsigned long stoul(string const& __str, size_t* __idx = nullptr, int __base
-// = 10); long long stoll(string const& __str, size_t* __idx = nullptr, int
-// __base = 10); unsigned long long stoull(string const& __str, size_t* __idx =
-// nullptr, int __base = 10);
-
-// float stof(string const& __str, size_t* __idx = nullptr);
-// double stod(string const& __str, size_t* __idx = nullptr);
-// long double stold(string const& __str, size_t* __idx = nullptr);
-
-// Constexpr-friendly integer log10 ceil (replaces the broken recursive lambda)
-
 template <std::size_t N, class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-inplace_string<N> unchecked_to_inplace_string(T val) noexcept
+inline QX_CONSTEXPR_CXX23 inplace_string<N> unchecked_to_inplace_string(T val) noexcept
 {
     inplace_string<N> res;
     auto const begin = res.data();
@@ -2539,7 +2659,7 @@ inplace_string<N> unchecked_to_inplace_string(T val) noexcept
 }
 
 template <std::size_t N, class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-std::optional<inplace_string<N>> try_to_inplace_string(T val) noexcept
+inline QX_CONSTEXPR_CXX23 std::optional<inplace_string<N>> try_to_inplace_string(T val) noexcept
 {
     inplace_string<N> res;
     auto const begin = res.data();
@@ -2551,7 +2671,7 @@ std::optional<inplace_string<N>> try_to_inplace_string(T val) noexcept
 }
 
 template <std::size_t N, class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-inplace_string<N> to_inplace_string(T val)
+inline QX_CONSTEXPR_CXX23 inplace_string<N> to_inplace_string(T val)
 {
     inplace_string<N> res;
     auto const begin = res.data();
@@ -2563,7 +2683,7 @@ inplace_string<N> to_inplace_string(T val)
 }
 
 template <class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-auto to_inplace_string(T val) noexcept
+inline QX_CONSTEXPR_CXX23 auto to_inplace_string(T val) noexcept
 {
     static constexpr std::size_t kRequiredN = std::is_integral_v<T>
         ? 2 + std::numeric_limits<T>::digits10 // integral types
@@ -2578,13 +2698,14 @@ auto to_inplace_string(T val) noexcept
 }
 
 template <class CharT, class Traits, std::size_t N>
-std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& os, basic_inplace_string<N, CharT, Traits> const& str)
+inline std::basic_ostream<CharT, Traits>& operator<<(
+    std::basic_ostream<CharT, Traits>& os, basic_inplace_string<N, CharT, Traits> const& str)
 {
     return os << std::basic_string_view<CharT, Traits>(str);
 }
 
 template <class CharT, class Traits, std::size_t N>
-std::basic_istream<CharT, Traits>& operator>>(std::basic_istream<CharT, Traits>& is, basic_inplace_string<N, CharT, Traits>& str)
+inline std::basic_istream<CharT, Traits>& operator>>(std::basic_istream<CharT, Traits>& is, basic_inplace_string<N, CharT, Traits>& str)
 {
     std::ios_base::iostate state = std::ios_base::goodbit;
     typename std::basic_istream<CharT, Traits>::sentry sentry(is);

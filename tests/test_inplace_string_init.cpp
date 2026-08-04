@@ -6,7 +6,6 @@
 #include <deque>
 #include <forward_list>
 #include <list>
-#include <type_traits>
 #include <vector>
 
 static_assert(qx::intl::is_trivial_contiguous_iterator_v<std::vector<char>::iterator>);
@@ -15,11 +14,6 @@ static_assert(!qx::intl::is_trivial_contiguous_iterator_v<std::list<char>::itera
 static_assert(qx::intl::is_trivial_contiguous_iterator_v<std::array<char, 10>::iterator>);
 static_assert(qx::intl::is_trivial_contiguous_iterator_v<std::string::iterator>);
 static_assert(qx::intl::is_trivial_contiguous_iterator_v<std::string_view::iterator>);
-
-static_assert(std::is_trivially_copyable_v<qx::inplace_string<30>>);
-static_assert(std::is_trivially_copyable_v<qx::inplace_wstring<30>>);
-static_assert(std::is_trivially_copyable_v<qx::inplace_string<256>>);
-static_assert(std::is_trivially_copyable_v<qx::inplace_wstring<256>>);
 
 // Constructors & Initialization
 
