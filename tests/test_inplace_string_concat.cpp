@@ -58,7 +58,7 @@ TEST(InplaceStringConcat, WithStdString)
     EXPECT_EQ(std_val + inplace_val, "defabc");
 
     // Move semantics
-    EXPECT_EQ(std::string{"abc"} + inplace_val, "abcdef");
+    EXPECT_EQ(std::string{"abc"} + inplace_val, "abcabc");
     EXPECT_EQ(inplace_val + std::string{"def"}, "abcdef");
 }
 
