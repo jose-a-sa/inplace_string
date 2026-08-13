@@ -534,6 +534,101 @@ constexpr bool is_overlapping_range(T const* begin, T const* end, U const* begin
     throw std::length_error{msg};
 }
 
+template <std::size_t, class SizeT, class CharT, class>
+struct inplace_string_storage_empty
+{
+    inline static CharT empty_char{};
+
+    QX_CONSTEXPR_CXX20 void swap(inplace_string_storage_empty& /*other*/) noexcept {}
+
+    constexpr void set_size(SizeT /* n */) noexcept {}
+    constexpr SizeT size() const noexcept { return 0; }
+    constexpr CharT const* data() const noexcept { return &empty_char; }
+    constexpr CharT* data() noexcept { return &empty_char; }
+};
+
+template <std::size_t N, class SizeT, class CharT, class>
+class inplace_string_storage_trivial
+{
+    union // NOLINT(*-non-private-member-variables-in-classes)
+    {
+        SizeT size_{};
+        CharT _; //< ensures similar layout to libc++ short representation
+    };
+    CharT data_[N + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
+
+public:
+    constexpr inplace_string_storage_trivial() noexcept { data_[0] = CharT{}; } // NOTE: to avoid full buffer init
+
+    QX_CONSTEXPR_CXX20 void swap(inplace_string_storage_trivial& other) noexcept
+    {
+        auto const n_swap = std::max(size_, other.size_); // NOLINT(*-union-access)
+        std::swap_ranges(data_, data_ + n_swap, other.data_);
+        std::swap(size_, other.size_); // NOLINT(*-union-access)
+    }
+
+    constexpr void set_size(SizeT n) noexcept { size_ = n; } // NOLINT(*-union-access)
+    constexpr SizeT size() const noexcept { return size_; }  // NOLINT(*-union-access)
+    constexpr CharT const* data() const noexcept { return data_; }
+    constexpr CharT* data() noexcept { return data_; }
+};
+
+template <std::size_t N, class SizeT, class CharT, class Traits>
+class inplace_string_storage_nontrivial
+{
+    union // NOLINT(*-non-private-member-variables-in-classes)
+    {
+        SizeT size_{};
+        CharT _; //< ensures similar layout to libc++ short representation
+    };
+    CharT data_[N + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
+
+    template <class Other>
+    QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& assign(Other const& other) noexcept
+    {
+        size_ = other.size_;                         // NOLINT(*-union-access)
+        Traits::copy(data_, other.data_, size_ + 1); // NOLINT(*-union-access)
+        return *this;
+    }
+
+public:
+    constexpr inplace_string_storage_nontrivial() noexcept { data_[0] = CharT{}; }
+
+    QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial(inplace_string_storage_nontrivial const& other) noexcept { assign(other); }
+
+    QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& operator=(inplace_string_storage_nontrivial const& other) noexcept
+    {
+        return this == &other ? *this : assign(other);
+    }
+    QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial(inplace_string_storage_nontrivial&& other) noexcept { assign(other); }
+
+    QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& operator=(inplace_string_storage_nontrivial&& other) noexcept
+    {
+        return this == &other ? *this : assign(other);
+    }
+
+    QX_CONSTEXPR_CXX20 ~inplace_string_storage_nontrivial() noexcept = default;
+
+    QX_CONSTEXPR_CXX20 void swap(inplace_string_storage_nontrivial& other) noexcept
+    {
+        auto const n_swap = std::max(size_, other.size_); // NOLINT(*-union-access)
+        std::swap_ranges(data_, data_ + n_swap, other.data_);
+        std::swap(size_, other.size_); // NOLINT(*-union-access)
+    }
+
+    constexpr void set_size(SizeT n) noexcept { size_ = n; } // NOLINT(*-union-access)
+    constexpr SizeT size() const noexcept { return size_; }  // NOLINT(*-union-access)
+    constexpr CharT const* data() const noexcept { return data_; }
+    constexpr CharT* data() noexcept { return data_; }
+};
+
+template <std::size_t N, class CharT, class Traits>
+using inplace_string_storage = std::conditional_t<N == 0,
+    inplace_string_storage_empty<0, min_size_t<0>, CharT, Traits>,
+    std::conditional_t<sizeof(inplace_string_storage_trivial<N, min_size_t<N>, CharT, Traits>) <= QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD,
+        inplace_string_storage_trivial<N, min_size_t<N>, CharT, Traits>,
+        inplace_string_storage_nontrivial<N, min_size_t<N>, CharT, Traits>>>;
+
 } // namespace intl
 
 template <std::size_t N, class CharT, class Traits = std::char_traits<CharT>>
@@ -560,7 +655,7 @@ template <class CharT, std::size_t N>
 basic_inplace_string(CharT const (&)[N]) -> basic_inplace_string<N - 1, CharT>; // NOLINT(*-avoid-c-arrays)
 
 template <std::size_t N, class CharT, class Traits>
-class basic_inplace_string
+class basic_inplace_string : private intl::inplace_string_storage<N, CharT, Traits>
 {
     static_assert(!std::is_array_v<CharT>, "Character type of basic_inplace_string must not be an array");
     static_assert(std::is_standard_layout_v<CharT>, "Character type of basic_inplace_string must be standard-layout");
@@ -568,7 +663,8 @@ class basic_inplace_string
         std::is_trivially_default_constructible_v<CharT>, "Character type of basic_inplace_string must be trivially default constructible");
     static_assert(std::is_trivially_copyable_v<CharT>, "Character type of basic_inplace_string must be trivially copyable");
     static_assert(std::is_same_v<CharT, typename Traits::char_type>, "Traits::char_type must be the same type as CharT");
-
+    
+    using base = intl::inplace_string_storage<N, CharT, Traits>;
     using self = basic_inplace_string;
     using self_view = std::basic_string_view<CharT, Traits>;
 
@@ -707,7 +803,7 @@ public:
     constexpr const_reverse_iterator crbegin() const noexcept { return rbegin(); }
     constexpr const_reverse_iterator crend() const noexcept { return rend(); }
 
-    [[nodiscard]] constexpr size_type size() const noexcept { return rep_.size(); }
+    [[nodiscard]] constexpr size_type size() const noexcept { return base::size(); }
     [[nodiscard]] constexpr size_type length() const noexcept { return size(); }
     [[nodiscard]] static constexpr size_type max_size() noexcept { return N; }
     [[nodiscard]] static constexpr size_type capacity() noexcept { return N; }
@@ -752,25 +848,25 @@ public:
     constexpr const_reference operator[](size_type pos) const noexcept
     {
         QX_ASSERT_CONTRACT(pos <= size(), "inplace_string::operator[](pos): pos out of bounds");
-        return rep_.data()[pos];
+        return base::data()[pos];
     }
     constexpr reference operator[](size_type pos) noexcept
     {
         QX_ASSERT_CONTRACT(pos <= size(), "inplace_string::operator[](pos): pos out of bounds");
-        return rep_.data()[pos];
+        return base::data()[pos];
     }
 
     constexpr const_reference at(size_type pos) const
     {
         if (pos >= size())
             intl::throw_out_of_range("basic_inplace_string::at");
-        return rep_.data()[pos];
+        return base::data()[pos];
     }
     constexpr reference at(size_type pos)
     {
         if (pos >= size())
             intl::throw_out_of_range("basic_inplace_string::at");
-        return rep_.data()[pos];
+        return base::data()[pos];
     }
 
     basic_inplace_string& operator+=(basic_inplace_string const& str) { return append(str); }
@@ -1672,13 +1768,13 @@ public:
         return res;
     }
 
-    QX_CONSTEXPR_CXX20 void swap(basic_inplace_string& other) noexcept { rep_.swap(other.rep_); }
+    QX_CONSTEXPR_CXX20 void swap(basic_inplace_string& other) noexcept { base::swap(other); }
 
     // c_str, data
 
     constexpr CharT const* c_str() const noexcept { return data(); }
-    constexpr CharT const* data() const noexcept { return rep_.data(); }
-    constexpr CharT* data() noexcept { return rep_.data(); }
+    constexpr CharT const* data() const noexcept { return base::data(); }
+    constexpr CharT* data() noexcept { return base::data(); }
 
     // find
 
@@ -2092,111 +2188,14 @@ private:
     // internal type used to store the size information, automatically changes between capacities
     using compressed_size_type = intl::min_size_t<N>;
 
-    // The actual size type used for storing the size of the string. It is chosen based on the maximum size of the
-    // string (N) to save space. It is guaranteed to be large enough to store any size up to N, and it is an unsigned
-    // integer type for simplicity of implementation.
-    struct inplace_string_storage_empty
-    {
-        static inline value_type empty_char{};
-
-        QX_CONSTEXPR_CXX20 void swap(inplace_string_storage_empty& /*other*/) noexcept {}
-
-        constexpr void set_size(compressed_size_type /* n */) noexcept {}
-        constexpr compressed_size_type size() const noexcept { return 0; }
-        constexpr const_pointer data() const noexcept { return &empty_char; }
-        constexpr pointer data() noexcept { return &empty_char; }
-    };
-
-    class inplace_string_storage_trivial
-    {
-        union // NOLINT(*-non-private-member-variables-in-classes)
-        {
-            compressed_size_type size_{};
-            value_type _; //< ensures similar layout to libc++ short representation
-        };
-        value_type data_[N + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
-
-    public:
-        constexpr inplace_string_storage_trivial() noexcept { data_[0] = value_type{}; } // NOTE: to avoid full buffer init
-
-        QX_CONSTEXPR_CXX20 void swap(inplace_string_storage_trivial& other) noexcept
-        {
-            auto const n_swap = std::max(size_, other.size_); // NOLINT(*-union-access)
-            std::swap_ranges(data_, data_ + n_swap, other.data_);
-            std::swap(size_, other.size_); // NOLINT(*-union-access)
-        }
-
-        constexpr void set_size(compressed_size_type n) noexcept { size_ = n; }    // NOLINT(*-union-access)
-        constexpr compressed_size_type size() const noexcept { return size_; } // NOLINT(*-union-access)
-        constexpr const_pointer data() const noexcept { return data_; }
-        constexpr pointer data() noexcept { return data_; }
-    };
-
-    class inplace_string_storage_nontrivial
-    {
-        union // NOLINT(*-non-private-member-variables-in-classes)
-        {
-            compressed_size_type size_{};
-            value_type _; //< ensures similar layout to libc++ short representation
-        };
-        value_type data_[N + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
-
-        template <class Other>
-        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& assign(Other const& other) noexcept
-        {
-            size_ = other.size_;                              // NOLINT(*-union-access)
-            traits_type::copy(data_, other.data_, size_ + 1); // NOLINT(*-union-access)
-            return *this;
-        }
-
-    public:
-        constexpr inplace_string_storage_nontrivial() noexcept { data_[0] = value_type{}; }
-
-        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial(inplace_string_storage_nontrivial const& other) noexcept { assign(other); }
-
-        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& operator=(inplace_string_storage_nontrivial const& other) noexcept
-        {
-            return this == &other ? *this : assign(other);
-        }
-        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial(inplace_string_storage_nontrivial&& other) noexcept { assign(other); }
-
-        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& operator=(inplace_string_storage_nontrivial&& other) noexcept
-        {
-            return this == &other ? *this : assign(other);
-        }
-
-        QX_CONSTEXPR_CXX20 ~inplace_string_storage_nontrivial() noexcept = default;
-
-        QX_CONSTEXPR_CXX20 void swap(inplace_string_storage_nontrivial& other) noexcept
-        {
-            auto const n_swap = std::max(size_, other.size_); // NOLINT(*-union-access)
-            std::swap_ranges(data_, data_ + n_swap, other.data_);
-            std::swap(size_, other.size_); // NOLINT(*-union-access)
-        }
-
-        constexpr void set_size(compressed_size_type n) noexcept { size_ = n; }    // NOLINT(*-union-access)
-        constexpr compressed_size_type size() const noexcept { return size_; } // NOLINT(*-union-access)
-        constexpr const_pointer data() const noexcept { return data_; }
-        constexpr pointer data() noexcept { return data_; }
-    };
-
-    using inplace_string_storage = std::conditional_t<N == 0,
-        inplace_string_storage_empty,
-        std::conditional_t<sizeof(inplace_string_storage_trivial) <= QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD,
-            inplace_string_storage_trivial,
-            inplace_string_storage_nontrivial>>;
-
-    // inplace_string representation
-    [[no_unique_address]] inplace_string_storage rep_{};
-
     // size and null termination as single operation
 
     QX_CONSTEXPR_CXX20 void set_size_and_null_terminate(size_type n) noexcept
     {
         QX_ASSERT_CONTRACT(
             n <= std::numeric_limits<compressed_size_type>::max(), "inplace_string::set_size_and_null_terminate(n) size overflow");
-        traits_type::assign(rep_.data()[n], value_type{});
-        rep_.set_size(static_cast<compressed_size_type>(n));
+        traits_type::assign(base::data()[n], value_type{});
+        base::set_size(static_cast<compressed_size_type>(n));
     }
 
     QX_CONSTEXPR_CXX20 void init(value_type const* str, size_type n)
