@@ -259,10 +259,10 @@ inline QX_COLD_NOINLINE void v_contract_fail_handler(char const* msg)
 // clang-format off
 template <std::size_t N>
 using min_size_t = 
-    std::conditional_t<(N <= std::numeric_limits<std::uint_least8_t>::max()),  std::uint_least8_t,
-    std::conditional_t<(N <= std::numeric_limits<std::uint_least16_t>::max()), std::uint_least16_t,
-    std::conditional_t<(N <= std::numeric_limits<std::uint_least32_t>::max()), std::uint_least32_t,
-    std::conditional_t<(N <= std::numeric_limits<std::uint_least64_t>::max()), std::uint_least64_t, 
+    std::conditional_t<(N <= (std::numeric_limits<std::uint_least8_t>::max)()),  std::uint_least8_t,
+    std::conditional_t<(N <= (std::numeric_limits<std::uint_least16_t>::max)()), std::uint_least16_t,
+    std::conditional_t<(N <= (std::numeric_limits<std::uint_least32_t>::max)()), std::uint_least32_t,
+    std::conditional_t<(N <= (std::numeric_limits<std::uint_least64_t>::max)()), std::uint_least64_t, 
     std::size_t>>>>;
 // clang-format on
 
