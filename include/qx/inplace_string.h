@@ -2186,7 +2186,6 @@ public:
 #endif
 
 private:
-
     // size and null termination as single operation
     QX_CONSTEXPR_CXX20 void set_size_and_null_terminate(size_type n) noexcept
     {
@@ -2562,7 +2561,8 @@ template <std::size_t N, class CharT, class Traits, std::size_t M>
 inline QX_CONSTEXPR_CXX20 auto operator+(qx::basic_inplace_string<N, CharT, Traits> const& lhs,
     qx::basic_inplace_string<M, CharT, Traits> const& rhs) noexcept -> qx::basic_inplace_string<N + M, CharT, Traits>
 {
-    return qx::basic_inplace_string<N + M, CharT, Traits>(lhs).unchecked_append(rhs);
+    qx::basic_inplace_string<N + M, CharT, Traits> res;
+    return res.unchecked_append(lhs).unchecked_append(rhs);
 }
 
 // inplace + literal
@@ -2570,7 +2570,8 @@ template <std::size_t N, class CharT, class Traits, std::size_t M>
 inline QX_CONSTEXPR_CXX20 auto operator+(qx::basic_inplace_string<N, CharT, Traits> const& lhs, CharT const (&rhs)[M]) noexcept
     -> qx::basic_inplace_string<N + M - 1, CharT, Traits>
 {
-    return qx::basic_inplace_string<N + M - 1, CharT, Traits>(lhs).unchecked_append(rhs, M - 1);
+    qx::basic_inplace_string<N + M - 1, CharT, Traits> res;
+    return res.unchecked_append(lhs).unchecked_append(rhs, M - 1);
 }
 
 // literal + inplace
@@ -2578,7 +2579,8 @@ template <std::size_t N, class CharT, class Traits, std::size_t M>
 inline QX_CONSTEXPR_CXX20 auto operator+(CharT const (&lhs)[M], qx::basic_inplace_string<N, CharT, Traits> const& rhs) noexcept
     -> qx::basic_inplace_string<N + M - 1, CharT, Traits>
 {
-    return qx::basic_inplace_string<N + M - 1, CharT, Traits>(lhs).unchecked_append(rhs);
+    qx::basic_inplace_string<N + M - 1, CharT, Traits> res;
+    return res.unchecked_append(lhs, M - 1).unchecked_append(rhs);
 }
 
 // inplace + char
@@ -2586,9 +2588,8 @@ template <std::size_t N, class CharT, class Traits>
 inline QX_CONSTEXPR_CXX20 auto operator+(qx::basic_inplace_string<N, CharT, Traits> const& lhs, CharT rhs) noexcept
     -> qx::basic_inplace_string<N + 1, CharT, Traits>
 {
-    qx::basic_inplace_string<N + 1, CharT, Traits> res(lhs);
-    res.push_back(rhs);
-    return res;
+    qx::basic_inplace_string<N + 1, CharT, Traits> res;
+    return res.unchecked_append(lhs).unchecked_push_back(rhs);
 }
 
 // char + inplace
@@ -2597,8 +2598,7 @@ inline QX_CONSTEXPR_CXX20 auto operator+(CharT lhs, qx::basic_inplace_string<N, 
     -> qx::basic_inplace_string<N + 1, CharT, Traits>
 {
     qx::basic_inplace_string<N + 1, CharT, Traits> res;
-    res.push_back(lhs);
-    return res.unchecked_append(rhs);
+    return res.unchecked_push_back(lhs).unchecked_append(rhs);
 }
 
 #endif // QX_INPLACE_STRING_NO_OPERATOR_PLUS
