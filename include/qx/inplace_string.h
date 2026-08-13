@@ -524,6 +524,16 @@ constexpr bool is_overlapping_range(T const* begin, T const* end, U const* begin
     return is_pointer_in_range(begin, end, begin2) || is_pointer_in_range(begin2, end2, begin);
 }
 
+[[noreturn]] QX_COLD_NOINLINE inline void throw_out_of_range(char const* msg)
+{
+    throw std::out_of_range{msg};
+}
+
+[[noreturn]] QX_COLD_NOINLINE inline void throw_out_of_capacity(char const* msg)
+{
+    throw std::length_error{msg};
+}
+
 } // namespace intl
 
 template <std::size_t N, class CharT, class Traits = std::char_traits<CharT>>
@@ -598,7 +608,7 @@ public:
     {
         size_type const str_sz = str.size();
         if (pos > str_sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string");
         init(str.data() + pos, std::min(n, str_sz - pos));
     }
 
@@ -626,7 +636,7 @@ public:
     QX_CONSTEXPR_CXX20 basic_inplace_string(CharT const* str) // NOLINT(*-explicit-constructor, *-explicit-conversions)
         : basic_inplace_string()
     {
-        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string(ptr) detected nul lptr");
+        QX_ASSERT_CONTRACT(str != nullptr, "inplace_string(ptr) detected nullptr");
         init(str, traits_type::length(str));
     }
 
@@ -674,7 +684,7 @@ public:
     constexpr basic_inplace_string& operator=(CharT c)
     {
         if (capacity() == 0)
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::operator=");
         traits_type::assign(*data(), c);
         set_size_and_null_terminate(1);
         return *this;
@@ -682,10 +692,10 @@ public:
 
     basic_inplace_string& operator=(std::initializer_list<CharT> il) { return assign(il.begin(), il.size()); }
 
-    constexpr iterator begin() noexcept { return rep_.data; }
-    constexpr const_iterator begin() const noexcept { return rep_.data; }
-    constexpr iterator end() noexcept { return rep_.data + size(); }
-    constexpr const_iterator end() const noexcept { return rep_.data + size(); }
+    constexpr iterator begin() noexcept { return data(); }
+    constexpr const_iterator begin() const noexcept { return data(); }
+    constexpr iterator end() noexcept { return data() + size(); }
+    constexpr const_iterator end() const noexcept { return data() + size(); }
 
     constexpr reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
     constexpr const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(end()); }
@@ -697,15 +707,15 @@ public:
     constexpr const_reverse_iterator crbegin() const noexcept { return rbegin(); }
     constexpr const_reverse_iterator crend() const noexcept { return rend(); }
 
-    [[nodiscard]] constexpr size_type size() const noexcept { return rep_.size; }
-    [[nodiscard]] constexpr size_type length() const noexcept { return rep_.size; }
+    [[nodiscard]] constexpr size_type size() const noexcept { return rep_.size(); }
+    [[nodiscard]] constexpr size_type length() const noexcept { return size(); }
     [[nodiscard]] static constexpr size_type max_size() noexcept { return N; }
     [[nodiscard]] static constexpr size_type capacity() noexcept { return N; }
 
     void resize(size_type n, CharT c)
     {
         if (n > max_size())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::resize");
 
         if (n > size())
             unchecked_append(n - size(), c);
@@ -721,7 +731,7 @@ public:
         using result_type = decltype(std::move(op)(data(), n));
         static_assert(std::is_integral_v<result_type>, "Operation return type must be integer-like");
         if (n > capacity())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::resize_and_overwrite");
 
         set_size_and_null_terminate(n);
         erase_to_end(std::move(op)(data(), n));
@@ -730,7 +740,7 @@ public:
     static void reserve(size_type n)
     {
         if (n > max_size())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::reserve");
     }
 
     static void shrink_to_fit() noexcept { /* nop */ }
@@ -742,25 +752,25 @@ public:
     constexpr const_reference operator[](size_type pos) const noexcept
     {
         QX_ASSERT_CONTRACT(pos <= size(), "inplace_string::operator[](pos): pos out of bounds");
-        return rep_.data[pos];
+        return rep_.data()[pos];
     }
     constexpr reference operator[](size_type pos) noexcept
     {
         QX_ASSERT_CONTRACT(pos <= size(), "inplace_string::operator[](pos): pos out of bounds");
-        return rep_.data[pos];
+        return rep_.data()[pos];
     }
 
     constexpr const_reference at(size_type pos) const
     {
         if (pos >= size())
-            throw_out_of_range();
-        return rep_.data[pos];
+            intl::throw_out_of_range("basic_inplace_string::at");
+        return rep_.data()[pos];
     }
     constexpr reference at(size_type pos)
     {
         if (pos >= size())
-            throw_out_of_range();
-        return rep_.data[pos];
+            intl::throw_out_of_range("basic_inplace_string::at");
+        return rep_.data()[pos];
     }
 
     basic_inplace_string& operator+=(basic_inplace_string const& str) { return append(str); }
@@ -794,7 +804,7 @@ public:
     {
         size_type const str_sz = str.size();
         if (pos > str_sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::append");
         return append(str.data() + pos, std::min(n, str_sz - pos));
     }
 
@@ -804,7 +814,7 @@ public:
         auto const str_view = self_view(str);
         size_type const str_sz = str_view.size();
         if (pos > str_sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::append");
         return append(str_view.data() + pos, std::min(n, str_sz - pos));
     }
 
@@ -813,7 +823,7 @@ public:
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::append(ptr, n) detected nullptr");
         size_type const sz = size();
         if (n > capacity() - sz)
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::append");
 
         if (n > 0)
         {
@@ -836,7 +846,7 @@ public:
         {
             size_type const sz = size();
             if (n > capacity() - sz)
-                throw_out_of_capacity();
+                intl::throw_out_of_capacity("basic_inplace_string::append");
             pointer end = data() + sz;
             traits_type::assign(end, n, c);
             set_size_and_null_terminate(n + sz);
@@ -857,7 +867,7 @@ public:
             if (intl::is_trivial_contiguous_iterator_v<Iterator> && !address_in_range(*first))
             {
                 if (n > capacity() - sz)
-                    throw_out_of_capacity();
+                    intl::throw_out_of_capacity("basic_inplace_string::append");
                 copy_non_overlapping_range(first, last, data() + sz);
                 set_size_and_null_terminate(sz + n);
                 return *this;
@@ -978,7 +988,7 @@ public:
     QX_CONSTEXPR_CXX20 basic_inplace_string& push_back(CharT c)
     {
         if (size() == capacity())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::push_back");
         return unchecked_push_back(c);
     }
 
@@ -1040,7 +1050,7 @@ public:
     {
         size_type const str_size = str.size();
         if (pos > str_size)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::assign");
         return assign(str.data() + pos, std::min(n, str_size - pos));
     }
 
@@ -1050,7 +1060,7 @@ public:
         auto const str_view = self_view(str);
         size_type const str_size = str_view.size();
         if (pos > str_size)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::assign");
         return assign(str_view.data() + pos, std::min(n, str_size - pos));
     }
 
@@ -1058,7 +1068,7 @@ public:
     {
         QX_ASSERT_CONTRACT(n == 0 || str != nullptr, "inplace_string::assign(ptr, n) detected nullptr");
         if (n > capacity())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::assign");
         traits_type::move(data(), str, n);
         set_size_and_null_terminate(n);
         return *this;
@@ -1073,7 +1083,7 @@ public:
     QX_CONSTEXPR_CXX20 basic_inplace_string& assign(size_type n, CharT c)
     {
         if (n > capacity())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::assign");
         traits_type::assign(data(), n, c);
         set_size_and_null_terminate(n);
         return *this;
@@ -1185,7 +1195,7 @@ public:
     {
         size_type const str_sz = str.size();
         if (pos2 > str_sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::insert");
         return insert(pos1, str.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
@@ -1195,7 +1205,7 @@ public:
         auto const str_view = self_view(str);
         size_type const str_sz = str_view.size();
         if (pos2 > str_sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::insert");
         return insert(pos1, str_view.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
@@ -1205,9 +1215,9 @@ public:
         size_type sz = size();
 
         if (pos > sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::insert");
         if (n > capacity() - sz)
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::insert");
 
         if (n > 0)
         {
@@ -1236,12 +1246,12 @@ public:
     {
         size_type sz = size();
         if (pos > sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::insert");
 
         if (n > 0)
         {
             if (n > capacity() - sz)
-                throw_out_of_capacity();
+                intl::throw_out_of_capacity("basic_inplace_string::insert");
 
             pointer const ptr = data();
             size_type const n_move = sz - pos;
@@ -1445,7 +1455,7 @@ public:
     QX_CONSTEXPR_CXX20 basic_inplace_string& erase(size_type pos = 0, size_type n = npos)
     {
         if (pos > size())
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::erase");
 
         if (n == npos)
         {
@@ -1503,7 +1513,7 @@ public:
     {
         size_type const str_sz = str.size();
         if (pos2 > str_sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::replace");
         return replace(pos1, n1, str.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
@@ -1514,7 +1524,7 @@ public:
         auto const str_view = self_view(str);
         size_type const str_sz = str_view.size();
         if (pos2 > str_sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::replace");
         return replace(pos1, n1, str_view.data() + pos2, std::min(n2, str_sz - pos2));
     }
 
@@ -1524,12 +1534,12 @@ public:
 
         size_type const sz = size();
         if (pos > sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::replace");
 
         n1 = std::min(n1, sz - pos);
         size_type const new_size = sz - n1 + n2;
         if (new_size > capacity())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::replace");
 
         pointer const ptr = data();
         pointer const dst = ptr + pos;
@@ -1572,12 +1582,12 @@ public:
     {
         size_type const sz = size();
         if (pos > sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::replace");
 
         n1 = std::min(n1, sz - pos);
         size_type const new_size = sz - n1 + n2;
         if (new_size > capacity())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::replace");
 
         pointer const ptr = data();
         if (n1 != n2)
@@ -1635,7 +1645,7 @@ public:
     {
         size_type const sz = size();
         if (pos > sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::copy");
         size_type const rlen = std::min(n, sz - pos);
         traits_type::copy(str, data() + pos, rlen);
         return rlen;
@@ -1662,18 +1672,13 @@ public:
         return res;
     }
 
-    QX_CONSTEXPR_CXX20 void swap(basic_inplace_string& other) noexcept
-    {
-        size_type const n = std::max(size(), other.size()) + 1;
-        std::swap_ranges(rep_.data, rep_.data + n, other.rep_.data);
-        std::swap(rep_.size, other.rep_.size);
-    }
+    QX_CONSTEXPR_CXX20 void swap(basic_inplace_string& other) noexcept { rep_.swap(other.rep_); }
 
     // c_str, data
 
     constexpr CharT const* c_str() const noexcept { return data(); }
-    constexpr CharT const* data() const noexcept { return rep_.data; }
-    constexpr CharT* data() noexcept { return rep_.data; }
+    constexpr CharT const* data() const noexcept { return rep_.data(); }
+    constexpr CharT* data() noexcept { return rep_.data(); }
 
     // find
 
@@ -2033,7 +2038,7 @@ public:
         size_type const sz = size();
 
         if (pos1 > sz)
-            throw_out_of_range();
+            intl::throw_out_of_range("basic_inplace_string::compare");
 
         size_type const rlen = std::min(n1, sz - pos1);
 
@@ -2084,33 +2089,68 @@ public:
 #endif
 
 private:
+    // internal type used to store the size information, automatically changes between capacities
+    using compressed_size_type = intl::min_size_t<N>;
+
     // The actual size type used for storing the size of the string. It is chosen based on the maximum size of the
     // string (N) to save space. It is guaranteed to be large enough to store any size up to N, and it is an unsigned
     // integer type for simplicity of implementation.
-    template <class SizeT, class ChT, std::size_t M>
-    struct inplace_string_storage_trivial
+    struct inplace_string_storage_empty
     {
-        union // NOLINT(*-non-private-member-variables-in-classes)
-        {
-            SizeT size{};
-            ChT pad; //< ensures similar layout to libc++ short representation
-        };
-        ChT data[M + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
+        static inline value_type empty_char{};
 
-        constexpr inplace_string_storage_trivial() noexcept { data[0] = ChT{}; } // NOTE: to avoid full buffer init
+        QX_CONSTEXPR_CXX20 void swap(inplace_string_storage_empty& /*other*/) noexcept {}
+
+        constexpr void set_size(compressed_size_type /* n */) noexcept {}
+        constexpr compressed_size_type size() const noexcept { return 0; }
+        constexpr const_pointer data() const noexcept { return &empty_char; }
+        constexpr pointer data() noexcept { return &empty_char; }
     };
 
-    template <class SizeT, class ChT, std::size_t M>
-    struct inplace_string_storage_nontrivial
+    class inplace_string_storage_trivial
     {
         union // NOLINT(*-non-private-member-variables-in-classes)
         {
-            SizeT size{};
-            ChT pad; //< ensures similar layout to libc++ short representation
+            compressed_size_type size_{};
+            value_type _; //< ensures similar layout to libc++ short representation
         };
-        ChT data[M + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
+        value_type data_[N + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
 
-        constexpr inplace_string_storage_nontrivial() noexcept { data[0] = ChT{}; }
+    public:
+        constexpr inplace_string_storage_trivial() noexcept { data_[0] = value_type{}; } // NOTE: to avoid full buffer init
+
+        QX_CONSTEXPR_CXX20 void swap(inplace_string_storage_trivial& other) noexcept
+        {
+            auto const n_swap = std::max(size_, other.size_); // NOLINT(*-union-access)
+            std::swap_ranges(data_, data_ + n_swap, other.data_);
+            std::swap(size_, other.size_); // NOLINT(*-union-access)
+        }
+
+        constexpr void set_size(compressed_size_type n) noexcept { size_ = n; }    // NOLINT(*-union-access)
+        constexpr compressed_size_type size() const noexcept { return size_; } // NOLINT(*-union-access)
+        constexpr const_pointer data() const noexcept { return data_; }
+        constexpr pointer data() noexcept { return data_; }
+    };
+
+    class inplace_string_storage_nontrivial
+    {
+        union // NOLINT(*-non-private-member-variables-in-classes)
+        {
+            compressed_size_type size_{};
+            value_type _; //< ensures similar layout to libc++ short representation
+        };
+        value_type data_[N + 1]; // NOLINT(*-avoid-c-arrays, *-non-private-member-variables-in-classes)
+
+        template <class Other>
+        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& assign(Other const& other) noexcept
+        {
+            size_ = other.size_;                              // NOLINT(*-union-access)
+            traits_type::copy(data_, other.data_, size_ + 1); // NOLINT(*-union-access)
+            return *this;
+        }
+
+    public:
+        constexpr inplace_string_storage_nontrivial() noexcept { data_[0] = value_type{}; }
 
         QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial(inplace_string_storage_nontrivial const& other) noexcept { assign(other); }
 
@@ -2118,7 +2158,6 @@ private:
         {
             return this == &other ? *this : assign(other);
         }
-
         QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial(inplace_string_storage_nontrivial&& other) noexcept { assign(other); }
 
         QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& operator=(inplace_string_storage_nontrivial&& other) noexcept
@@ -2128,35 +2167,27 @@ private:
 
         QX_CONSTEXPR_CXX20 ~inplace_string_storage_nontrivial() noexcept = default;
 
-        template <class Other>
-        QX_CONSTEXPR_CXX20 inplace_string_storage_nontrivial& assign(Other const& other) noexcept
+        QX_CONSTEXPR_CXX20 void swap(inplace_string_storage_nontrivial& other) noexcept
         {
-            size = other.size;                             // NOLINT(*-union-access)
-            traits_type::copy(data, other.data, size + 1); // NOLINT(*-union-access)
-            return *this;
+            auto const n_swap = std::max(size_, other.size_); // NOLINT(*-union-access)
+            std::swap_ranges(data_, data_ + n_swap, other.data_);
+            std::swap(size_, other.size_); // NOLINT(*-union-access)
         }
+
+        constexpr void set_size(compressed_size_type n) noexcept { size_ = n; }    // NOLINT(*-union-access)
+        constexpr compressed_size_type size() const noexcept { return size_; } // NOLINT(*-union-access)
+        constexpr const_pointer data() const noexcept { return data_; }
+        constexpr pointer data() noexcept { return data_; }
     };
 
-    template <class SizeT, class ChT, std::size_t M>
-    static constexpr auto inplace_string_storage_size_v = sizeof(inplace_string_storage_trivial<SizeT, ChT, M>);
-
-    template <class SizeT, class ChT, std::size_t M>
-    using inplace_string_storage =
-        std::conditional_t<inplace_string_storage_size_v<SizeT, ChT, M> <= QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD,
-            inplace_string_storage_trivial<SizeT, ChT, M>,
-            inplace_string_storage_nontrivial<SizeT, ChT, M>>;
-
-    // internal type used to store the size information, automatically changes between capacities
-    using compressed_size_type = intl::min_size_t<N>;
+    using inplace_string_storage = std::conditional_t<N == 0,
+        inplace_string_storage_empty,
+        std::conditional_t<sizeof(inplace_string_storage_trivial) <= QX_INPLACE_STRING_TRIVIAL_COPY_THRESHOLD,
+            inplace_string_storage_trivial,
+            inplace_string_storage_nontrivial>>;
 
     // inplace_string representation
-    inplace_string_storage<compressed_size_type, CharT, N> rep_{};
-
-    // exception handling
-
-    [[noreturn]] static QX_COLD_NOINLINE void throw_out_of_range() { throw std::out_of_range{"basic_inplace_string"}; }
-
-    [[noreturn]] static QX_COLD_NOINLINE void throw_out_of_capacity() { throw std::length_error{"basic_inplace_string"}; }
+    [[no_unique_address]] inplace_string_storage rep_{};
 
     // size and null termination as single operation
 
@@ -2164,14 +2195,14 @@ private:
     {
         QX_ASSERT_CONTRACT(
             n <= std::numeric_limits<compressed_size_type>::max(), "inplace_string::set_size_and_null_terminate(n) size overflow");
-        traits_type::assign(rep_.data[n], value_type{});
-        rep_.size = static_cast<compressed_size_type>(n);
+        traits_type::assign(rep_.data()[n], value_type{});
+        rep_.set_size(static_cast<compressed_size_type>(n));
     }
 
     QX_CONSTEXPR_CXX20 void init(value_type const* str, size_type n)
     {
         if (n > max_size())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string");
         traits_type::copy(data(), str, n);
         set_size_and_null_terminate(n);
     }
@@ -2179,7 +2210,7 @@ private:
     QX_CONSTEXPR_CXX20 void init(size_type n, value_type c)
     {
         if (n > max_size())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string");
         traits_type::assign(data(), n, c);
         set_size_and_null_terminate(n);
     }
@@ -2214,7 +2245,7 @@ private:
 
         auto const n = static_cast<size_type>(std::distance(first, last));
         if (n > capacity())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::assign");
 
         const_pointer const src = intl::to_address(first);
         pointer const ptr = data();
@@ -2247,7 +2278,7 @@ private:
     QX_CONSTEXPR_CXX20 void init_with_size(Iterator first, Sentinel last, size_type sz)
     {
         if (sz > max_size())
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string");
 
         // strong exception guarantee: the string is left in a valid empty state if throws during initialization
         try
@@ -2285,7 +2316,7 @@ private:
     {
         size_type sz = size();
         if (n > capacity() - sz)
-            throw_out_of_capacity();
+            intl::throw_out_of_capacity("basic_inplace_string::insert");
         pointer const ptr = data();
 
         size_type const n_move = sz - ip;
@@ -2677,7 +2708,7 @@ inline QX_CONSTEXPR_CXX23 inplace_string<N> to_inplace_string(T val)
     auto const begin = res.data();
     auto const [end, ec] = std::to_chars(begin, begin + N, val);
     if (ec != std::errc())
-        inplace_string<N>::throw_out_of_capacity();
+        intl::throw_out_of_capacity("to_inplace_string");
     res.set_size_and_null_terminate(static_cast<std::size_t>(end - begin));
     return res;
 }
