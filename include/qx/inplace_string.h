@@ -2714,15 +2714,10 @@ template <class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 inline QX_CONSTEXPR_CXX23 auto to_inplace_string(T val) noexcept
 {
     static constexpr std::size_t kRequiredN = std::is_integral_v<T>
-        ? 2 + std::numeric_limits<T>::digits10 // integral types
+        ? 1 + std::numeric_limits<T>::digits10 + std::is_signed_v<T> // integral types
         : 4 + std::numeric_limits<T>::max_digits10 + std::max(2, intl::max_exponent_digits10_v<T>);
 
-    using SizeT = intl::min_size_t<kRequiredN>;
-    using RequiredStringT = inplace_string<kRequiredN>;
-    static constexpr std::size_t kSizeSize = std::max(sizeof(SizeT), sizeof(char));
-    static constexpr std::size_t kOptimalN = ((sizeof(RequiredStringT) - kSizeSize) / sizeof(char)) - 1;
-
-    return unchecked_to_inplace_string<kOptimalN>(val);
+    return unchecked_to_inplace_string<kRequiredN>(val);
 }
 
 template <class CharT, class Traits, std::size_t N>

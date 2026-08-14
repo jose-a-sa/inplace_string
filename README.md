@@ -72,6 +72,7 @@ static_assert(std::is_trivially_copyable_v<qx::inplace_string<62>>); // 64 bytes
 Controls the balance between copying all bytes via a trivial versus copying only active bytes. For small capacities below the threshold, trivially copying the entire `qx::inplace_string<N>` layout via bitwise copy is fast and enables POD/C-struct compatibility. For larger capacities above the threshold, non-trivial copy operations are preferred so that only active characters up to `size()` are copied via `std::char_traits::copy`, avoiding unnecessary overhead from copying unused trailing capacity.
 
 ### Disabling `operator+` Stack Expansion (`QX_INPLACE_STRING_NO_OPERATOR_PLUS`)
+
 By default, adding two `inplace_string` instances (`a + b`) creates a new `inplace_string<N + M>` at compile time. If you wish to prevent implicit stack growth or template code bloat from returning value types of capacity `N+M`, define `QX_INPLACE_STRING_NO_OPERATOR_PLUS`.
 
 ```cpp

@@ -120,8 +120,112 @@ TEST(InplaceString, ToInplaceStringUsesDefaultCapacityForFloatingPointValues)
     auto const decimal_double = qx::to_inplace_string(1.25);
     EXPECT_EQ(decimal_double, "1.25");
     EXPECT_EQ(decimal_double.size(), 4U);
+}
 
-    auto const infinity = qx::to_inplace_string(std::numeric_limits<float>::infinity());
-    EXPECT_EQ(infinity, "inf");
-    EXPECT_EQ(infinity.size(), 3U);
+TEST(InplaceString, ToInplaceStringUsesDefaultCapacityForFloatingPointLimits)
+{
+    auto const max_float = qx::to_inplace_string(std::numeric_limits<float>::max());
+    EXPECT_EQ(max_float, "3.4028235e+38");
+    EXPECT_EQ(max_float.size(), 13U);
+
+    auto const lowest_float = qx::to_inplace_string(std::numeric_limits<float>::lowest());
+    EXPECT_EQ(lowest_float, "-3.4028235e+38");
+    EXPECT_EQ(lowest_float.size(), 14U);
+
+    auto const max_double = qx::to_inplace_string(std::numeric_limits<double>::max());
+    EXPECT_EQ(max_double, "1.7976931348623157e+308");
+    EXPECT_EQ(max_double.size(), 23U);
+
+    auto const lowest_double = qx::to_inplace_string(std::numeric_limits<double>::lowest());
+    EXPECT_EQ(lowest_double, "-1.7976931348623157e+308");
+    EXPECT_EQ(lowest_double.size(), 24U);
+}
+
+TEST(InplaceString, ToInplaceStringSizedThrowsForInsufficientFloatingPointCapacity)
+{
+    EXPECT_NO_THROW(((void)qx::to_inplace_string<13>(std::numeric_limits<float>::max())));
+    EXPECT_THROW(((void)qx::to_inplace_string<12>(std::numeric_limits<float>::max())), std::length_error);
+    EXPECT_NO_THROW(((void)qx::to_inplace_string<23>(std::numeric_limits<double>::max())));
+    EXPECT_THROW(((void)qx::to_inplace_string<22>(std::numeric_limits<double>::max())), std::length_error);
+}
+
+TEST(InplaceString, TryToInplaceStringFloatingPointCapacityBoundary)
+{
+    EXPECT_TRUE(qx::try_to_inplace_string<13>(std::numeric_limits<float>::max()));
+    EXPECT_FALSE(qx::try_to_inplace_string<12>(std::numeric_limits<float>::max()));
+    EXPECT_TRUE(qx::try_to_inplace_string<23>(std::numeric_limits<double>::max()));
+    EXPECT_FALSE(qx::try_to_inplace_string<22>(std::numeric_limits<double>::max()));
+}
+
+TEST(InplaceString, ToInplaceStringHandlesFloatingPointExponentExtremes)
+{
+    auto const float_denorm = qx::to_inplace_string(std::numeric_limits<float>::denorm_min());
+    auto const double_denorm = qx::to_inplace_string(std::numeric_limits<double>::denorm_min());
+    auto const float_min = qx::to_inplace_string(std::numeric_limits<float>::min());
+    auto const double_min = qx::to_inplace_string(std::numeric_limits<double>::min());
+
+    EXPECT_FALSE(float_denorm.empty());
+    EXPECT_FALSE(double_denorm.empty());
+    EXPECT_FALSE(float_min.empty());
+    EXPECT_FALSE(double_min.empty());
+}
+
+TEST(InplaceString, ToInplaceStringHandlesNegativeFloatingPointLimits)
+{
+    auto const float_value = qx::to_inplace_string(std::numeric_limits<float>::lowest());
+    auto const double_value = qx::to_inplace_string(std::numeric_limits<double>::lowest());
+
+    EXPECT_FALSE(float_value.empty());
+    EXPECT_FALSE(double_value.empty());
+
+    EXPECT_EQ(float_value.front(), '-');
+    EXPECT_EQ(double_value.front(), '-');
+}
+
+TEST(InplaceString, ToInplaceStringHandlesFloatingPointSpecialValues)
+{
+    EXPECT_EQ(qx::to_inplace_string(std::numeric_limits<float>::infinity()), "inf");
+    EXPECT_EQ(qx::to_inplace_string(-std::numeric_limits<float>::infinity()), "-inf");
+    EXPECT_EQ(qx::to_inplace_string(std::numeric_limits<double>::infinity()), "inf");
+    EXPECT_EQ(qx::to_inplace_string(-std::numeric_limits<double>::infinity()), "-inf");
+
+    auto const nan = qx::to_inplace_string(std::numeric_limits<double>::quiet_NaN());
+    EXPECT_EQ(nan, "nan");
+}
+
+TEST(InplaceString, ToInplaceStringHandlesFloatingPointExplicitCapacity)
+{
+    EXPECT_NO_THROW({
+        auto const max_float = qx::to_inplace_string<13>(std::numeric_limits<float>::max());
+        EXPECT_EQ(max_float, "3.4028235e+38");
+    });
+    EXPECT_NO_THROW({
+        auto const negative_float = qx::to_inplace_string<14>(std::numeric_limits<float>::lowest());
+        EXPECT_EQ(negative_float, "-3.4028235e+38");
+    });
+    EXPECT_NO_THROW({ 
+        auto const max_double = qx::to_inplace_string<23>(std::numeric_limits<double>::max());
+        EXPECT_EQ(max_double, "1.7976931348623157e+308");
+    });
+    EXPECT_NO_THROW({ 
+        auto const negative_double = qx::to_inplace_string<24>(std::numeric_limits<double>::lowest());
+        EXPECT_EQ(negative_double, "-1.7976931348623157e+308");
+    });
+}
+
+TEST(InplaceString, ToInplaceStringSizedThrowsForInsufficientFloatingPointCapacityAtExtremes)
+{
+    EXPECT_THROW(((void)qx::to_inplace_string<12>(std::numeric_limits<float>::max())), std::length_error);
+    EXPECT_THROW(((void)qx::to_inplace_string<13>(std::numeric_limits<float>::lowest())), std::length_error);
+    EXPECT_THROW(((void)qx::to_inplace_string<21>(std::numeric_limits<double>::max())), std::length_error);
+    EXPECT_THROW(((void)qx::to_inplace_string<22>(std::numeric_limits<double>::lowest())), std::length_error);
+}
+
+TEST(InplaceString, ToInplaceStringHandlesSignedZero)
+{
+    auto const negative_float = qx::to_inplace_string(-0.0f);
+    auto const negative_double = qx::to_inplace_string(-0.0);
+
+    EXPECT_EQ(negative_float, "-0");
+    EXPECT_EQ(negative_double, "-0");
 }
