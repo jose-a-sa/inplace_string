@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
-project(qxlib VERSION 1.0 LANGUAGES CXX)
+project(qxlib VERSION 1.0.1 LANGUAGES CXX)
 
 if(NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)

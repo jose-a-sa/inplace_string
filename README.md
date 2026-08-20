@@ -24,7 +24,7 @@ include(FetchContent)
 FetchContent_Declare(
   qx_inplace_string
   GIT_REPOSITORY https://github.com/jose-a-sa/inplace_string.git
-  GIT_TAG        v1.0.0
+  GIT_TAG        v1.0.1
 )
 FetchContent_MakeAvailable(qx_inplace_string)
 
